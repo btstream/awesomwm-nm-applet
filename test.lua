@@ -1,4 +1,3 @@
-JSON = require("JSON")
 local wifi = require("wifi")
 local aps = wifi.get_access_points(false)
 local active_ap = wifi.get_active_ap()

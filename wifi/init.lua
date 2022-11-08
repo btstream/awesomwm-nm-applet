@@ -90,7 +90,11 @@ function M.get_active_ap()
         ap = dev:get_active_access_point()
         return ap ~= nil
     end)
-    if ap then return parse_ap_info(ap) end
+    if ap then
+        local r = parse_ap_info(ap)
+        r.active = true
+        return r
+    end
 end
 
 --- get all access point informations
