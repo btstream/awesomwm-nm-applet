@@ -3,7 +3,9 @@ local wibox = require("wibox")
 local gears = require("gears")
 local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
+local naughty = require("naughty")
 
+local devices = require(tostring(...):match(".*nm_applet") .. ".nm").devices
 local wifi = require(tostring(...):match(".*nm_applet") .. ".wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
@@ -91,20 +93,46 @@ local popup_menu = awful.popup({
     end,
 })
 
+local function process_wifi_list()
+    -- naughty.notify({ text = "jkjkjkjkj" })
+    local active = wifi.get_active_ap()
+    for _, dev in ipairs(devices) do
+        if
+            dev:get_device_type() == "WIFI"
+            and dev:get_state() == "ACTIVATED"
+        then
+            local aps = dev:get_access_points()
+            if -- if only get active ap
+                aps ~= nil
+                and #aps == 1
+                and wifi.parse_ap_info(aps[1]).ssid == active.ssid
+            then
+                gears.timer({
+                    single_shot = true,
+                    timeout = 5,
+                    callback = process_wifi_list,
+                })
+                return
+            else
+                for _, ap in ipairs(aps) do
+                    local info = wifi.parse_ap_info(ap)
+                    if info.ssid ~= active.ssid then list:add(row(info)) end
+                end
+            end
+        end
+    end
+end
+
 local function toggle()
     popup_menu.visible = not popup_menu.visible
     if popup_menu.visible then
         list:reset()
-
         -- for active ap
         local ap = wifi.get_active_ap()
-        list:add(row(ap))
+        if ap then list:add(row(ap)) end
 
-        -- for non_active ap
-        local scanned_aps = wifi.get_access_points()
-        for _, a in ipairs(scanned_aps) do
-            if a.ssid ~= "" then list:add(row(a)) end
-        end
+        wifi.scan()
+        process_wifi_list()
     end
 end
 

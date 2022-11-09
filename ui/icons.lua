@@ -1,13 +1,19 @@
+local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
+local client = nm.client
+
 local configurations =
     require(tostring(...):match(".*nm_applet.ui") .. ".configuration")
 
 local M = {}
 
 function M.get_wifi_icon(ap)
+    -- require("naughty").notify({ text = type(ap) })
+
     local default_config = configurations.get()
+    if not client.wireless_enabled then return default_config.icons.disabled end
     local icon = default_config.icons.disconnected
     if ap == nil then
-        icon = default_config.icon.disconnected
+        icon = default_config.icons.disconnected
     else
         local strength = ap.strength
         if strength < 20 then

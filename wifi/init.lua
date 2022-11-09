@@ -1,7 +1,10 @@
+local gears = require("gears")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
 -- local nm = require("nm")
 local NM = nm.nm
 local devs = nm.devices
+
+local naughty = require("naughty")
 
 ----------------------------------------------------------------------
 --           Util functions, all this function comme from           --
@@ -97,22 +100,72 @@ function M.get_active_ap()
     end
 end
 
+local dev_status = {}
+
 --- get all access point informations
----@param force_rescan boolean force rescan aps
-function M.get_access_points(force_rescan)
-    local scanned_aps = {}
+function M.scan()
+    local active = M.get_active_ap()
     for_each_wifi_dev(function(dev)
+        if dev:get_state() ~= "ACTIVATED" then return end
+        local last_scan = dev:get_last_scan()
+        local timeout = NM.utils_get_timestamp_msec() - last_scan
+
         local aps = dev:get_access_points()
-        -- need to scan
-        if not aps or #aps == 0 or #aps == 1 or force_rescan then
-            dev:request_scan()
-        end
-        for _, ap in ipairs(aps) do
-            table.insert(scanned_aps, parse_ap_info(ap))
+
+        -- check if only_active
+        local only_active = active ~= nil
+            and (
+                aps ~= nil
+                and #aps == 1
+                and parse_ap_info(aps[1]) == active.ssid
+            )
+
+        if last_scan < 0 or timeout >= 15000 or only_active then
+            -- naughty.notify({
+            --     text = string.format(
+            --         "%s-%s-%s",
+            --         last_scan,
+            --         timeout,
+            --         only_active
+            --     ),
+            -- })
+            -- dev.scan_status = "SCANNING"
+            dev_status[dev:get_udi()] = "SCANNING"
+            dev:request_scan_async(nil, function(d, result)
+                local ok, err = d:request_scan_finish(result)
+                if ok then
+                    aps = dev:get_access_points()
+
+                    -- check if only_active
+                    only_active = active ~= nil
+                        and (
+                            aps ~= nil
+                            and #aps == 1
+                            and parse_ap_info(aps[1]) == active.ssid
+                        )
+
+                    -- naughty.notify({ text = string.format("%s", #aps) })
+                    -- to do re_scan
+                    if aps == nil or #aps == 0 or only_active then
+                        gears.timer({
+                            timeout = 15,
+                            single_shot = true,
+                            callback = M.scan_wifi_list,
+                        })
+                        return
+                    end
+
+                    dev_status[dev:get_udi()] = "DONE"
+                else
+                    dev_status[dev:get_udi()] = "ERROR"
+                    d.scan_error_info = string.format("%s", err)
+                end
+            end)
         end
     end)
-    table.sort(scanned_aps, function(a, b) return a.strength > b.strength end)
-    return scanned_aps
 end
 
+function M.get_device_status(dev) return dev_status[dev:get_udi()] end
+
+M.parse_ap_info = parse_ap_info
 return M

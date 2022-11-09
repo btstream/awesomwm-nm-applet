@@ -1,5 +1,5 @@
 local wifi = require("wifi")
-local aps = wifi.get_access_points(false)
+local aps = wifi.get_wifi_list(false)
 local active_ap = wifi.get_active_ap()
 
 if active_ap then print(active_ap.ssid) end

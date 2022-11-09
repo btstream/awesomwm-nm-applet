@@ -17,7 +17,8 @@ local default_config = {
         strength3    = "󰤢",
         strength4    = "󰤥",
         strength5    = "󰤨",
-        disconnected = "󰤮",
+        disconnected = "󰤫",
+        disabled     = "󰤮",
     },
 }
 
