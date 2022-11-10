@@ -4,12 +4,15 @@ local gears = require("gears")
 local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
 
+local overflow =
+    require(tostring(...):match(".*nm_applet") .. ".ui.layouts.overflow")
+
 local wifi = require(tostring(...):match(".*nm_applet") .. ".wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".ui.configuration")
 
-local function row(ap)
+local function wifilist_ap_widget(ap)
     if ap == nil then return nil end
 
     local defaualt_config = configuration.get()
@@ -70,96 +73,23 @@ local function row(ap)
     return r
 end
 
-local list = wibox.widget({
-    widget = wibox.layout.fixed.vertical,
-})
-
-list.rows = {}
-list.render_start = 1
-list.scroll_down = function()
-    if list.render_start + 10 >= #list.rows then return end
-    list.render_start = list.render_start + 1
-    list.render_list()
-end
-list.scroll_up = function()
-    if list.render_start - 1 < 1 then return end
-    list.render_start = list.render_start - 1
-    list.render_list()
-end
-
-list.btn_up = wibox.widget({
-    widget = wibox.container.background,
-    {
-        widget = wibox.layout.align.horizontal,
-        expand = "none",
-        nil,
-        {
-            align = "center",
-            valign = "center",
-            markup = string.format(
-                '<span font="%s">%s</span>',
-                configuration.get().wifilist_btn_font,
-                ""
-            ),
-            widget = wibox.widget.textbox,
-        },
-        nil,
+local wifilist_ap_list = wibox.widget({
+    layout = overflow.vertical,
+    forced_height = dpi(300),
+    spacing = dpi(6),
+    scrollbar_widget = {
+        widget = wibox.widget.separator,
+        shape = function(cr, width, height, radius)
+            gears.shape.rounded_rect(cr, width, height, dpi(15))
+        end,
     },
+    scrollbar_width = dpi(4),
+    step = 50,
 })
-list.btn_up:buttons(gears.table.join(awful.button({}, 1, list.scroll_up)))
 
-list.btn_down = wibox.widget({
-    widget = wibox.container.background,
-    {
-        widget = wibox.layout.align.horizontal,
-        expand = "none",
-        nil,
-        {
-            align = "center",
-            valign = "center",
-            markup = string.format(
-                '<span font="%s">%s</span>',
-                configuration.get().wifilist_btn_font,
-                ""
-            ),
-            widget = wibox.widget.textbox,
-        },
-        nil,
-    },
-})
-list.btn_down:buttons(gears.table.join(awful.button({}, 1, list.scroll_down)))
-
-function list.render_list()
-    local render_end = list.render_start + 10
-    if render_end > #list.rows then
-        render_end = #list.rows
-        list.render_start = list.render_start - 1
-    end
-    -- render_end = render_end > #list.rows and #list.rows or render_end
-
-    local first_row = list.all_children[1]
-    list:reset()
-
-    if first_row.active then list:add(first_row) end
-    if list.render_start > 1 then list:add(list.btn_up) end
-
-    for i = list.render_start, render_end, 1 do
-        list:add(list.rows[i])
-    end
-
-    if render_end < #list.rows then list:add(list.btn_down) end
-end
-
-list:buttons(
-    gears.table.join(
-        awful.button({}, 4, list.scroll_up),
-        awful.button({}, 5, list.scroll_down)
-    )
-)
-
-local popup_menu = awful.popup({
+local popup_container = awful.popup({
     widget = {
-        list,
+        wifilist_ap_list,
         widget = wibox.container.margin,
         top = beautiful.systray_icon_spacing * 2,
         bottom = beautiful.systray_icon_spacing * 2,
@@ -193,21 +123,20 @@ local function process_wifi_list()
             autostart = true,
         })
     else
-        list.rows = {}
+        wifilist_ap_list.rows = {}
         for _, ap in ipairs(wifilist) do
-            table.insert(list.rows, row(ap))
+            wifilist_ap_list:add(wifilist_ap_widget(ap))
         end
-        list.render_list()
     end
 end
 
 local function toggle()
-    popup_menu.visible = not popup_menu.visible
-    if popup_menu.visible then
-        list.render_start = 1
-        list:reset()
+    popup_container.visible = not popup_container.visible
+    if popup_container.visible then
+        wifilist_ap_list.render_start = 1
+        wifilist_ap_list:reset()
         local ap = wifi.get_active_ap()
-        if ap then list:add(row(ap)) end
+        if ap then wifilist_ap_list:add(wifilist_ap_widget(ap)) end
 
         wifi.scan()
         process_wifi_list()
