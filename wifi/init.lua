@@ -134,9 +134,11 @@ function M.scan()
                             and parse_ap_info(aps[1]) == active.ssid
                         )
 
-                    -- naughty.notify({ text = string.format("%s", #aps) })
                     -- to do re_scan
                     if aps == nil or #aps == 0 or only_active then
+                        gears.debug.print_warning(
+                            "nm-applet: wifi scan does not get any result, scheduled to rescan"
+                        )
                         gears.timer({
                             timeout = 15,
                             single_shot = true,
@@ -149,7 +151,9 @@ function M.scan()
                     dev_status[dev:get_udi()] = "DONE"
                 else
                     dev_status[dev:get_udi()] = "ERROR"
-                    d.scan_error_info = string.format("%s", err)
+                    gears.debug.print_error(
+                        string.format("nm-applet: get scanning errors, %s", err)
+                    )
                 end
             end)
         end
@@ -163,7 +167,6 @@ function M.get_wifilist()
     local active = M.get_active_ap()
     for_each_wifi_dev(function(dev)
         local aps = dev:get_access_points()
-        gears.debug.print_warning(string.format("get %s wifi aps", #aps))
         if
             (aps == nil or #aps == 0) -- if does not have aps
             or (
@@ -179,14 +182,15 @@ function M.get_wifilist()
                 local info = parse_ap_info(ap)
 
                 -- ignore active ssid
-                if
-                    active ~= nil and active.ssid == info.ssid
-                    or active.ssid == ""
-                then
+                if active ~= nil and active.ssid == info.ssid then
                     goto continue
                 end
 
-                table.insert(wifilist, parse_ap_info(ap))
+                if info.ssid == "" then
+                    goto continue
+                end
+
+                table.insert(wifilist, info)
 
                 ::continue::
             end
@@ -198,5 +202,4 @@ function M.get_wifilist()
     return wifilist, scan_done
 end
 
-M.parse_ap_info = parse_ap_info
 return M

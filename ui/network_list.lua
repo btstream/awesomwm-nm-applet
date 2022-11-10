@@ -4,22 +4,19 @@ local gears = require("gears")
 local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
 
-local devices = require(tostring(...):match(".*nm_applet") .. ".nm").devices
 local wifi = require(tostring(...):match(".*nm_applet") .. ".wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".ui.configuration")
 
---- generate row from an ap
----@param ap
 local function row(ap)
     if ap == nil then return nil end
 
-    local defaualt_configs = configuration.get()
+    local defaualt_config = configuration.get()
     local wifi_icon = icons.get_wifi_icon(ap)
-    local wifi_color = defaualt_configs.nonactive_wifi_color
-    if ap.active then wifi_color = defaualt_configs.active_wifi_color end
-    local wifi_lock = ap.wpa_flags == "" or ""
+    local wifi_color = defaualt_config.nonactive_wifi_color
+    if ap.active then wifi_color = defaualt_config.active_wifi_color end
+    local wifi_lock = ap.wpa_flags == " " or ""
 
     local r = wibox.widget({
         widget = wibox.container.background,
@@ -35,10 +32,11 @@ local function row(ap)
                 {
                     widget = wibox.widget.textbox,
                     markup = string.format(
-                        '<span font="%s" color="%s">%s</span>   %s',
-                        defaualt_configs.font_icon,
+                        '<span font="%s" color="%s">%s</span>   <span font="%s">%s</span>',
+                        defaualt_config.wifilist_icon_font,
                         wifi_color,
                         wifi_icon,
+                        defaualt_config.wifilist_text_font,
                         ap.ssid
                     ),
                     align = "center",
@@ -57,15 +55,18 @@ local function row(ap)
                     align = "center",
                     valign = "center",
                     markup = string.format(
-                        '<span font="%s">%s</span>',
-                        defaualt_configs.font_icon,
+                        '<span font="%s %s">%s</span>',
+                        defaualt_config.applet_icon_font,
+                        defaualt_config.wifilist_icon_size,
                         wifi_lock
                     ),
                 },
             },
         },
     })
-
+    r:connect_signal("mouse::enter", function(r) r.bg = beautiful.bg_focus end)
+    r:connect_signal("mouse::leave", function(r) r.bg = beautiful.bg_normal end)
+    r.active = ap.active
     return r
 end
 
@@ -73,8 +74,96 @@ local list = wibox.widget({
     widget = wibox.layout.fixed.vertical,
 })
 
+list.rows = {}
+list.render_start = 1
+list.scroll_down = function()
+    if list.render_start + 10 >= #list.rows then return end
+    list.render_start = list.render_start + 1
+    list.render_list()
+end
+list.scroll_up = function()
+    if list.render_start - 1 < 1 then return end
+    list.render_start = list.render_start - 1
+    list.render_list()
+end
+
+list.btn_up = wibox.widget({
+    widget = wibox.container.background,
+    {
+        widget = wibox.layout.align.horizontal,
+        expand = "none",
+        nil,
+        {
+            align = "center",
+            valign = "center",
+            markup = string.format(
+                '<span font="%s">%s</span>',
+                configuration.get().wifilist_btn_font,
+                ""
+            ),
+            widget = wibox.widget.textbox,
+        },
+        nil,
+    },
+})
+list.btn_up:buttons(gears.table.join(awful.button({}, 1, list.scroll_up)))
+
+list.btn_down = wibox.widget({
+    widget = wibox.container.background,
+    {
+        widget = wibox.layout.align.horizontal,
+        expand = "none",
+        nil,
+        {
+            align = "center",
+            valign = "center",
+            markup = string.format(
+                '<span font="%s">%s</span>',
+                configuration.get().wifilist_btn_font,
+                ""
+            ),
+            widget = wibox.widget.textbox,
+        },
+        nil,
+    },
+})
+list.btn_down:buttons(gears.table.join(awful.button({}, 1, list.scroll_down)))
+
+function list.render_list()
+    local render_end = list.render_start + 10
+    if render_end > #list.rows then
+        render_end = #list.rows
+        list.render_start = list.render_start - 1
+    end
+    -- render_end = render_end > #list.rows and #list.rows or render_end
+
+    local first_row = list.all_children[1]
+    list:reset()
+
+    if first_row.active then list:add(first_row) end
+    if list.render_start > 1 then list:add(list.btn_up) end
+
+    for i = list.render_start, render_end, 1 do
+        list:add(list.rows[i])
+    end
+
+    if render_end < #list.rows then list:add(list.btn_down) end
+end
+
+list:buttons(
+    gears.table.join(
+        awful.button({}, 4, list.scroll_up),
+        awful.button({}, 5, list.scroll_down)
+    )
+)
+
 local popup_menu = awful.popup({
-    widget = list,
+    widget = {
+        list,
+        widget = wibox.container.margin,
+        top = beautiful.systray_icon_spacing * 2,
+        bottom = beautiful.systray_icon_spacing * 2,
+    },
     ontop = true,
     visible = false,
     shape = function(cr, width, height)
@@ -93,45 +182,10 @@ local popup_menu = awful.popup({
 })
 
 local function process_wifi_list()
-    gears.debug.print_warning("Running process_wifi_list")
-    -- local active = wifi.get_active_ap()
-    -- for _, dev in ipairs(devices) do
-    --     if
-    --         dev:get_device_type() == "WIFI"
-    --         and dev:get_state() == "ACTIVATED"
-    --     then
-    --         local aps = dev:get_access_points()
-    --         if -- if only get active ap
-    --             aps ~= nil
-    --             and #aps == 1
-    --             and wifi.parse_ap_info(aps[1]).ssid == active.ssid
-    --         then
-    --             gears.timer({
-    --                 single_shot = true,
-    --                 timeout = 5,
-    --                 callback = process_wifi_list,
-    --             })
-    --             return
-    --         else
-    --             for _, ap in ipairs(aps) do
-    --                 local info = wifi.parse_ap_info(ap)
-    --                 if info.ssid ~= active.ssid then list:add(row(info)) end
-    --             end
-    --         end
-    --     end
-    -- end
     local wifilist, scan_done = wifi.get_wifilist()
 
-    gears.debug.print_warning(
-        string.format(
-            "get %s aps from get_wifilist(), scan status is %s",
-            #wifilist,
-            scan_done
-        )
-    )
-
     if #wifilist == 0 and not scan_done then
-        gears.debug.print_warning("schedule to re get wifilist")
+        gears.debug.print_warning("schedule to reget wifilist")
         gears.timer({
             single_shot = true,
             timeout = 5,
@@ -139,15 +193,18 @@ local function process_wifi_list()
             autostart = true,
         })
     else
+        list.rows = {}
         for _, ap in ipairs(wifilist) do
-            list:add(row(ap))
+            table.insert(list.rows, row(ap))
         end
+        list.render_list()
     end
 end
 
 local function toggle()
     popup_menu.visible = not popup_menu.visible
     if popup_menu.visible then
+        list.render_start = 1
         list:reset()
         local ap = wifi.get_active_ap()
         if ap then list:add(row(ap)) end

@@ -22,7 +22,7 @@ local function update_indicator()
     indicator:set_markup_silently(
         string.format(
             '<span font="%s">%s</span>',
-            default_config.icon_font,
+            default_config.applet_icon_font,
             icons.get_wifi_icon(ap)
         )
     )

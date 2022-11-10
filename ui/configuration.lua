@@ -5,7 +5,13 @@ local dpi = require("beautiful.xresources").apply_dpi
 local default_config = {
     left = beautiful.systray_icon_spacing or dpi(5),
     right = beautiful.systray_icon_spacing or dpi(5),
-    icon_font = beautiful.nm_applet_icon_font or "Material Design Icons 12",
+    applet_icon_font = beautiful.nm_applet_icon_font
+        or "Material Design Icons 12",
+    wifilist_icon_font = beautiful.nm_wifilist_icon_font
+        or "Material Design Icons 11",
+    wifilist_text_font = beautiful.nm_wifilist_text_font or beautiful.font,
+    wifilist_btn_font = beautiful.nm_wifilist_btn_font
+        or "JetBrainsMono Nerd Font Mono 8",
 
     active_wifi_color = beautiful.active_wifi_color or beautiful.fg_normal,
     nonactive_wifi_color = beautiful.fg_normal,
