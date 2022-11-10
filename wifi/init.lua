@@ -4,8 +4,6 @@ local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
 local NM = nm.nm
 local devs = nm.devices
 
-local naughty = require("naughty")
-
 ----------------------------------------------------------------------
 --           Util functions, all this function comme from           --
 --                     NetworkManager examples                      --
@@ -85,6 +83,9 @@ local function for_each_wifi_dev(callback)
     end
 end
 
+local dev_status = {}
+local function get_scan_status(dev) return dev_status[dev:get_udi()] end
+
 local M = {}
 
 function M.get_active_ap()
@@ -99,8 +100,6 @@ function M.get_active_ap()
         return r
     end
 end
-
-local dev_status = {}
 
 --- get all access point informations
 function M.scan()
@@ -121,15 +120,6 @@ function M.scan()
             )
 
         if last_scan < 0 or timeout >= 15000 or only_active then
-            -- naughty.notify({
-            --     text = string.format(
-            --         "%s-%s-%s",
-            --         last_scan,
-            --         timeout,
-            --         only_active
-            --     ),
-            -- })
-            -- dev.scan_status = "SCANNING"
             dev_status[dev:get_udi()] = "SCANNING"
             dev:request_scan_async(nil, function(d, result)
                 local ok, err = d:request_scan_finish(result)
@@ -151,6 +141,7 @@ function M.scan()
                             timeout = 15,
                             single_shot = true,
                             callback = M.scan_wifi_list,
+                            autostart = true,
                         })
                         return
                     end
@@ -165,7 +156,47 @@ function M.scan()
     end)
 end
 
-function M.get_device_status(dev) return dev_status[dev:get_udi()] end
+function M.get_wifilist()
+    local wifilist = {}
+    local scan_done = false
+
+    local active = M.get_active_ap()
+    for_each_wifi_dev(function(dev)
+        local aps = dev:get_access_points()
+        gears.debug.print_warning(string.format("get %s wifi aps", #aps))
+        if
+            (aps == nil or #aps == 0) -- if does not have aps
+            or (
+                active ~= nil
+                and #aps == 1
+                and parse_ap_info(aps[1]).ssid == active.ssid
+            ) -- or only active
+        then
+            scan_done = false
+            return
+        else
+            for _, ap in ipairs(aps) do
+                local info = parse_ap_info(ap)
+
+                -- ignore active ssid
+                if
+                    active ~= nil and active.ssid == info.ssid
+                    or active.ssid == ""
+                then
+                    goto continue
+                end
+
+                table.insert(wifilist, parse_ap_info(ap))
+
+                ::continue::
+            end
+            scan_done = get_scan_status(dev) == "DONE"
+        end
+    end)
+
+    table.sort(wifilist, function(a, b) return a.strength > b.strength end)
+    return wifilist, scan_done
+end
 
 M.parse_ap_info = parse_ap_info
 return M

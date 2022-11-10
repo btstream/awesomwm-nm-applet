@@ -3,7 +3,6 @@ local wibox = require("wibox")
 local gears = require("gears")
 local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
-local naughty = require("naughty")
 
 local devices = require(tostring(...):match(".*nm_applet") .. ".nm").devices
 local wifi = require(tostring(...):match(".*nm_applet") .. ".wifi")
@@ -94,31 +93,54 @@ local popup_menu = awful.popup({
 })
 
 local function process_wifi_list()
-    -- naughty.notify({ text = "jkjkjkjkj" })
-    local active = wifi.get_active_ap()
-    for _, dev in ipairs(devices) do
-        if
-            dev:get_device_type() == "WIFI"
-            and dev:get_state() == "ACTIVATED"
-        then
-            local aps = dev:get_access_points()
-            if -- if only get active ap
-                aps ~= nil
-                and #aps == 1
-                and wifi.parse_ap_info(aps[1]).ssid == active.ssid
-            then
-                gears.timer({
-                    single_shot = true,
-                    timeout = 5,
-                    callback = process_wifi_list,
-                })
-                return
-            else
-                for _, ap in ipairs(aps) do
-                    local info = wifi.parse_ap_info(ap)
-                    if info.ssid ~= active.ssid then list:add(row(info)) end
-                end
-            end
+    gears.debug.print_warning("Running process_wifi_list")
+    -- local active = wifi.get_active_ap()
+    -- for _, dev in ipairs(devices) do
+    --     if
+    --         dev:get_device_type() == "WIFI"
+    --         and dev:get_state() == "ACTIVATED"
+    --     then
+    --         local aps = dev:get_access_points()
+    --         if -- if only get active ap
+    --             aps ~= nil
+    --             and #aps == 1
+    --             and wifi.parse_ap_info(aps[1]).ssid == active.ssid
+    --         then
+    --             gears.timer({
+    --                 single_shot = true,
+    --                 timeout = 5,
+    --                 callback = process_wifi_list,
+    --             })
+    --             return
+    --         else
+    --             for _, ap in ipairs(aps) do
+    --                 local info = wifi.parse_ap_info(ap)
+    --                 if info.ssid ~= active.ssid then list:add(row(info)) end
+    --             end
+    --         end
+    --     end
+    -- end
+    local wifilist, scan_done = wifi.get_wifilist()
+
+    gears.debug.print_warning(
+        string.format(
+            "get %s aps from get_wifilist(), scan status is %s",
+            #wifilist,
+            scan_done
+        )
+    )
+
+    if #wifilist == 0 and not scan_done then
+        gears.debug.print_warning("schedule to re get wifilist")
+        gears.timer({
+            single_shot = true,
+            timeout = 5,
+            callback = process_wifi_list,
+            autostart = true,
+        })
+    else
+        for _, ap in ipairs(wifilist) do
+            list:add(row(ap))
         end
     end
 end
@@ -127,7 +149,6 @@ local function toggle()
     popup_menu.visible = not popup_menu.visible
     if popup_menu.visible then
         list:reset()
-        -- for active ap
         local ap = wifi.get_active_ap()
         if ap then list:add(row(ap)) end
 
