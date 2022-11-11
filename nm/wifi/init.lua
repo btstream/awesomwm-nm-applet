@@ -18,43 +18,78 @@ local function is_empty(t)
 end
 
 local function ssid_to_utf8(ap)
-    local ssid = ap:get_ssid()
+    local ssid = ""
+    if type(ap.get_ssid) == "userdata" then
+        ssid = ap:get_ssid()
+    else
+        ssid = ap.Ssid
+    end
     if not ssid then return "" end
-    return NM.utils_ssid_to_utf8(ssid:get_data())
+    return NM.utils_ssid_to_utf8(
+        type(ap.get_ssid) == "userdata" and ssid:get_data() or ssid
+    )
 end
 
 local function flags_to_string(flags)
     local str = ""
-    for flag, _ in pairs(flags) do
-        str = str .. " " .. flag
+    -- if comes from dbus
+    if type(flags) == "number" then
+        if flags == 1 then
+            str = str .. " " .. "PRIVACY"
+        else
+            str = "NONE"
+        end
+    else
+        for flag, _ in pairs(flags) do
+            str = str .. " " .. flag
+        end
+        if str == "" then str = "NONE" end
     end
-    if str == "" then str = "NONE" end
     return (str:gsub("^%s", ""))
 end
 
 local function flags_to_security(flags, wpa_flags, rsn_flags)
     local str = ""
-    if flags["PRIVACY"] and is_empty(wpa_flags) and is_empty(rsn_flags) then
-        str = str .. " WEP"
-    end
-    if not is_empty(wpa_flags) then str = str .. " WPA1" end
-    if not is_empty(rsn_flags) then str = str .. " WPA2" end
-    if wpa_flags["KEY_MGMT_802_1X"] or rsn_flags["KEY_MGMT_802_1X"] then
-        str = str .. " 802.1X"
+
+    -- if comes from dbus
+    if type(flags) == "number" then
+        if flags == 1 and wpa_flags == 0 and rsn_flags == 0 then
+            str = str .. " WEP"
+        end
+        if wpa_flags ~= 0 then str = str .. " WPA1" end
+        if not rsn_flags ~= 0 then str = str .. " WPA2" end
+        if wpa_flags == 512 or rsn_flags == 512 then str = str .. " 802.1X" end
+    else
+        if flags["PRIVACY"] and is_empty(wpa_flags) and is_empty(rsn_flags) then
+            str = str .. " WEP"
+        end
+        if not is_empty(wpa_flags) then str = str .. " WPA1" end
+        if not is_empty(rsn_flags) then str = str .. " WPA2" end
+        if wpa_flags["KEY_MGMT_802_1X"] or rsn_flags["KEY_MGMT_802_1X"] then
+            str = str .. " 802.1X"
+        end
     end
     return (str:gsub("^%s", ""))
 end
 
 local function parse_ap_info(ap)
-    local strength = ap:get_strength()
-    local frequency = ap:get_frequency()
-    local flags = ap:get_flags()
-    local wpa_flags = ap:get_wpa_flags()
-    local rsn_flags = ap:get_rsn_flags()
+    local strength = type(ap.get_strength) == "userdata" and ap:get_strength()
+        or ap.Strength
+    local frequency = type(ap.get_frequency) == "userdata"
+            and ap:get_frequency()
+        or ap.Frequency
+    local flags = type(ap.get_flags) == "userdata" and ap:get_flags()
+        or ap.Flags
+    local wpa_flags = type(ap.get_wpa_flags) == "userdata"
+            and ap:get_wpa_flags()
+        or ap.WpaFlags
+    local rsn_flags = type(ap.get_rsn_flags) == "userdata"
+            and ap:get_rsn_flags()
+        or ap.RsnFlags
     -- remove extra NONE from the flags tables
-    flags["NONE"] = nil
-    wpa_flags["NONE"] = nil
-    rsn_flags["NONE"] = nil
+    if type(flags) == "table" then flags["NONE"] = nil end
+    if type(wpa_flags) == "table" then wpa_flags["NONE"] = nil end
+    if type(rsn_flags) == "table" then rsn_flags["NONE"] = nil end
     return {
         ssid = ssid_to_utf8(ap),
         bssid = ap:get_bssid(),
@@ -83,6 +118,10 @@ end
 
 local dev_status = {}
 local function get_scan_status(dev) return dev_status[dev:get_udi()] end
+
+----------------------------------------------------------------------
+--                           wifi modules                           --
+----------------------------------------------------------------------
 
 local M = gears.object()
 function M:get_active_ap()
@@ -117,14 +156,14 @@ function M:scan()
                 and parse_ap_info(aps[1]) == active.ssid
             )
 
-        gears.debug.print_warning(
-            string.format(
-                "scan condition %s, %s, %s",
-                last_scan < 0,
-                timeout >= 15000,
-                only_active
-            )
-        )
+        -- gears.debug.print_warning(
+        --     string.format(
+        --         "scan condition %s, %s, %s",
+        --         last_scan < 0,
+        --         only_active,
+        --         timeout >= 15000
+        --     )
+        -- )
 
         if last_scan < 0 or only_active or timeout >= 15000 then
             dev_status[dev:get_udi()] = "SCANNING"
@@ -154,7 +193,7 @@ function M:scan()
                             "nm-applet: wifi scan does not get any result, scheduled to rescan"
                         )
                         gears.timer({
-                            timeout = 15,
+                            timeout = 3,
                             single_shot = true,
                             callback = function() M:scan() end,
                             autostart = true,
@@ -163,7 +202,7 @@ function M:scan()
                     end
 
                     dev_status[dev:get_udi()] = "DONE"
-                    self:emit_signal("wifiscan::done", ">>>")
+                    self:emit_signal("wifiscan::done")
                 else
                     dev_status[dev:get_udi()] = "ERROR"
                     gears.debug.print_error(
@@ -173,7 +212,7 @@ function M:scan()
             end)
         else
             gears.debug.print_warning("already scanned, do not scan right now")
-            self:emit_signal("wifiscan::done", "<<<")
+            self:emit_signal("wifiscan::done")
         end
     end)
 end

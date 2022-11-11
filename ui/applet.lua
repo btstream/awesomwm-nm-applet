@@ -2,7 +2,7 @@ local awful = require("awful")
 local gears = require("gears")
 local wibox = require("wibox")
 
-local wifi = require(tostring(...):match(".*nm_applet") .. ".wifi")
+local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 
 local configuration =
     require(tostring(...):match(".*nm_applet.ui") .. ".configuration")

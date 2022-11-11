@@ -7,7 +7,7 @@ local dpi = require("beautiful.xresources").apply_dpi
 local overflow =
     require(tostring(...):match(".*nm_applet") .. ".ui.layouts.overflow")
 
-local wifi = require(tostring(...):match(".*nm_applet") .. ".wifi")
+local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".ui.configuration")
@@ -124,7 +124,7 @@ local popup_container = awful.popup({
     end,
 })
 
-local function process_wifi_list(_, scan_info)
+local function process_wifi_list()
     local active = wifi:get_active_ap()
     local wifilist, scan_done = wifi:get_wifilist()
 
