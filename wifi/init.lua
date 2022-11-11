@@ -45,11 +45,6 @@ local function flags_to_security(flags, wpa_flags, rsn_flags)
     return (str:gsub("^%s", ""))
 end
 
-----------------------------------------------------------------------
---                            Parse Info                            --
-----------------------------------------------------------------------
---- parse ap info
---- @return table
 local function parse_ap_info(ap)
     local strength = ap:get_strength()
     local frequency = ap:get_frequency()
@@ -73,8 +68,11 @@ local function parse_ap_info(ap)
     }
 end
 
---- an help function to run
----@param callback function parameter is device, if return value is true then break the loop
+----------------------------------------------------------------------
+--            other helper function, does not come from             --
+--                     NetworkManager examples                      --
+----------------------------------------------------------------------
+
 local function for_each_wifi_dev(callback)
     for _, dev in ipairs(devs) do
         if dev:get_device_type() == "WIFI" then
@@ -86,9 +84,8 @@ end
 local dev_status = {}
 local function get_scan_status(dev) return dev_status[dev:get_udi()] end
 
-local M = {}
-
-function M.get_active_ap()
+local M = gears.object()
+function M:get_active_ap()
     local ap = nil
     for_each_wifi_dev(function(dev)
         ap = dev:get_active_access_point()
@@ -102,10 +99,11 @@ function M.get_active_ap()
 end
 
 --- get all access point informations
-function M.scan()
-    local active = M.get_active_ap()
+function M:scan()
+    local active = M:get_active_ap()
     for_each_wifi_dev(function(dev)
-        if dev:get_state() ~= "ACTIVATED" then return end
+        -- gears.debug.print_warning(dev:get_state())
+        if dev:get_state() == "UNAVAILABLE" then return end
         local last_scan = dev:get_last_scan()
         local timeout = NM.utils_get_timestamp_msec() - last_scan
 
@@ -119,7 +117,16 @@ function M.scan()
                 and parse_ap_info(aps[1]) == active.ssid
             )
 
-        if last_scan < 0 or timeout >= 15000 or only_active then
+        gears.debug.print_warning(
+            string.format(
+                "scan condition %s, %s, %s",
+                last_scan < 0,
+                timeout >= 15000,
+                only_active
+            )
+        )
+
+        if last_scan < 0 or only_active or timeout >= 15000 then
             dev_status[dev:get_udi()] = "SCANNING"
             dev:request_scan_async(nil, function(d, result)
                 local ok, err = d:request_scan_finish(result)
@@ -135,20 +142,28 @@ function M.scan()
                         )
 
                     -- to do re_scan
-                    if aps == nil or #aps == 0 or only_active then
+                    if
+                        (aps == nil or #aps == 0) -- if does not have aps
+                        or ( -- only active aps
+                            active ~= nil
+                            and #aps == 1
+                            and parse_ap_info(aps[1]).ssid == active.ssid
+                        )
+                    then
                         gears.debug.print_warning(
                             "nm-applet: wifi scan does not get any result, scheduled to rescan"
                         )
                         gears.timer({
                             timeout = 15,
                             single_shot = true,
-                            callback = M.scan_wifi_list,
+                            callback = function() M:scan() end,
                             autostart = true,
                         })
                         return
                     end
 
                     dev_status[dev:get_udi()] = "DONE"
+                    self:emit_signal("wifiscan::done", ">>>")
                 else
                     dev_status[dev:get_udi()] = "ERROR"
                     gears.debug.print_error(
@@ -156,15 +171,18 @@ function M.scan()
                     )
                 end
             end)
+        else
+            gears.debug.print_warning("already scanned, do not scan right now")
+            self:emit_signal("wifiscan::done", "<<<")
         end
     end)
 end
 
-function M.get_wifilist()
+function M:get_wifilist()
     local wifilist = {}
     local scan_done = false
 
-    local active = M.get_active_ap()
+    local active = M:get_active_ap()
     for_each_wifi_dev(function(dev)
         local aps = dev:get_access_points()
         if
@@ -182,9 +200,9 @@ function M.get_wifilist()
                 local info = parse_ap_info(ap)
 
                 -- ignore active ssid
-                if active ~= nil and active.ssid == info.ssid then
-                    goto continue
-                end
+                -- if active ~= nil then
+                --     goto continue
+                -- end
 
                 if info.ssid == "" then
                     goto continue

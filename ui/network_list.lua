@@ -73,13 +73,17 @@ local function wifilist_ap_widget(ap)
     return r
 end
 
+local wifilist_active_ap = wibox.widget({
+    widget = wibox.layout.fixed.vertical,
+})
+
 local wifilist_ap_list = wibox.widget({
     layout = overflow.vertical,
     forced_height = dpi(300),
     spacing = dpi(6),
     scrollbar_widget = {
         widget = wibox.widget.separator,
-        shape = function(cr, width, height, radius)
+        shape = function(cr, width, height, _)
             gears.shape.rounded_rect(cr, width, height, dpi(15))
         end,
     },
@@ -89,7 +93,16 @@ local wifilist_ap_list = wibox.widget({
 
 local popup_container = awful.popup({
     widget = {
-        wifilist_ap_list,
+        {
+            {
+                wifilist_active_ap,
+                right = dpi(4),
+                widget = wibox.container.margin,
+            },
+            wifilist_ap_list,
+            layout = wibox.layout.fixed.vertical,
+            spacing = dpi(6),
+        },
         widget = wibox.container.margin,
         top = beautiful.systray_icon_spacing * 2,
         bottom = beautiful.systray_icon_spacing * 2,
@@ -111,35 +124,51 @@ local popup_container = awful.popup({
     end,
 })
 
-local function process_wifi_list()
-    local wifilist, scan_done = wifi.get_wifilist()
+local function process_wifi_list(_, scan_info)
+    local active = wifi:get_active_ap()
+    local wifilist, scan_done = wifi:get_wifilist()
 
-    if #wifilist == 0 and not scan_done then
+    if
+        (
+            #wifilist == 0
+            or (
+                #wifilist == 1
+                and active ~= nil
+                and wifilist[1].ssid == active.ssid
+            )
+        ) and not scan_done
+    then
         gears.debug.print_warning("schedule to reget wifilist")
         gears.timer({
-            single_shot = true,
-            timeout = 5,
             callback = process_wifi_list,
+            single_shot = true,
+            timeout = 3,
             autostart = true,
         })
     else
-        wifilist_ap_list.rows = {}
+        gears.debug.print_warning(#wifilist)
         for _, ap in ipairs(wifilist) do
-            wifilist_ap_list:add(wifilist_ap_widget(ap))
+            if not (active and active.ssid == ap.ssid) then
+                wifilist_ap_list:add(wifilist_ap_widget(ap))
+            end
         end
     end
 end
 
+wifi:connect_signal("wifiscan::done", process_wifi_list)
+
 local function toggle()
     popup_container.visible = not popup_container.visible
-    if popup_container.visible then
-        wifilist_ap_list.render_start = 1
-        wifilist_ap_list:reset()
-        local ap = wifi.get_active_ap()
-        if ap then wifilist_ap_list:add(wifilist_ap_widget(ap)) end
 
-        wifi.scan()
-        process_wifi_list()
+    if popup_container.visible then
+        wifilist_ap_list:reset()
+        local active = wifi:get_active_ap()
+        if active then
+            wifilist_active_ap:reset()
+            wifilist_active_ap:add(wifilist_ap_widget(active))
+        end
+        wifilist_ap_list:reset()
+        wifi:scan()
     end
 end
 

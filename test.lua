@@ -1,13 +1,5 @@
-local wifi = require("wifi")
-local aps = wifi.get_wifi_list(false)
-local active_ap = wifi.get_active_ap()
+local lgi = require("lgi")
+local dbus = require("nm.dbus")
 
-if active_ap then print(active_ap.ssid) end
-
-for _, ap in ipairs(aps) do
-    if ap.ssid == "" then
-        goto continue
-    end
-    print(ap.ssid)
-    ::continue::
-end
+local mainloop = lgi.GLib.MainLoop()
+mainloop:run()
