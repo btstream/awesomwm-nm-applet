@@ -1,5 +1,7 @@
 local gears = require("gears")
+local inspect = require("inspect")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
+local dbus = require(tostring(...):match(".*nm_applet") .. ".nm.dbus")
 -- local nm = require("nm")
 local NM = nm.nm
 local devs = nm.devices
@@ -73,6 +75,8 @@ local function flags_to_security(flags, wpa_flags, rsn_flags)
 end
 
 local function parse_ap_info(ap)
+    if ap == nil then return ap end
+
     local strength = type(ap.get_strength) == "userdata" and ap:get_strength()
         or ap.Strength
     local frequency = type(ap.get_frequency) == "userdata"
@@ -92,10 +96,10 @@ local function parse_ap_info(ap)
     if type(rsn_flags) == "table" then rsn_flags["NONE"] = nil end
     return {
         ssid = ssid_to_utf8(ap),
-        bssid = ap:get_bssid(),
+        bssid = type(ap.get_bssid) == "userdata" and ap:get_bssid() or ap.Bssid,
         frequency = frequency,
         channel = NM.utils_wifi_freq_to_channel(frequency),
-        mode = ap:get_mode(),
+        mode = type(ap.get_mode) == "userdata" and ap:get_mode() or ap.Mode,
         flags = flags_to_string(flags),
         wpa_flags = flags_to_string(wpa_flags),
         security = flags_to_security(flags, wpa_flags, rsn_flags),
@@ -124,17 +128,27 @@ local function get_scan_status(dev) return dev_status[dev:get_udi()] end
 ----------------------------------------------------------------------
 
 local M = gears.object()
+
+dbus:connect_signal(
+    "wifi::ap_properties_changed",
+    function(_, properties) M:emit_signal("wifi::ap_properties_changed", properties) end
+)
+
+dbus:connect_signal(
+    "wifi::activated",
+    function() M:emit_signal("wifi::activated") end
+)
+
+dbus:connect_signal(
+    "wifi::disconnected",
+    function() M:emit_signal("wifi::disconnected") end
+)
+
 function M:get_active_ap()
-    local ap = nil
-    for_each_wifi_dev(function(dev)
-        ap = dev:get_active_access_point()
-        return ap ~= nil
-    end)
-    if ap then
-        local r = parse_ap_info(ap)
-        r.active = true
-        return r
-    end
+    local ret = parse_ap_info(dbus.active_access_point)
+    if ret == nil then return nil end
+    ret.active = true
+    return ret
 end
 
 --- get all access point informations
@@ -202,7 +216,7 @@ function M:scan()
                     end
 
                     dev_status[dev:get_udi()] = "DONE"
-                    self:emit_signal("wifiscan::done")
+                    self:emit_signal("wifi::scan_done")
                 else
                     dev_status[dev:get_udi()] = "ERROR"
                     gears.debug.print_error(
@@ -212,7 +226,7 @@ function M:scan()
             end)
         else
             gears.debug.print_warning("already scanned, do not scan right now")
-            self:emit_signal("wifiscan::done")
+            self:emit_signal("wifi::scan_done")
         end
     end)
 end

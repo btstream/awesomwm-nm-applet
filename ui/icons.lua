@@ -7,8 +7,6 @@ local configurations =
 local M = {}
 
 function M.get_wifi_icon(ap)
-    -- require("naughty").notify({ text = type(ap) })
-
     local default_config = configurations.get()
     if not client.wireless_enabled then return default_config.icons.disabled end
     local icon = default_config.icons.disconnected

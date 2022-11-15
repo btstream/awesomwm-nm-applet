@@ -73,10 +73,6 @@ local function wifilist_ap_widget(ap)
     return r
 end
 
-local wifilist_active_ap = wibox.widget({
-    widget = wibox.layout.fixed.vertical,
-})
-
 local wifilist_ap_list = wibox.widget({
     layout = overflow.vertical,
     forced_height = dpi(300),
@@ -94,11 +90,6 @@ local wifilist_ap_list = wibox.widget({
 local popup_container = awful.popup({
     widget = {
         {
-            {
-                wifilist_active_ap,
-                right = dpi(4),
-                widget = wibox.container.margin,
-            },
             wifilist_ap_list,
             layout = wibox.layout.fixed.vertical,
             spacing = dpi(6),
@@ -114,14 +105,8 @@ local popup_container = awful.popup({
     end,
     minimum_width = dpi(240),
     maximum_width = dpi(240),
-    placement = function(w)
-        awful.placement.top_right(w, {
-            margins = {
-                top = dpi(32) + beautiful.useless_gap * 2,
-                right = beautiful.useless_gap * 2,
-            },
-        })
-    end,
+    border_color = beautiful.border_normal,
+    border_width = dpi(1),
 })
 
 local function process_wifi_list()
@@ -155,19 +140,16 @@ local function process_wifi_list()
     end
 end
 
-wifi:connect_signal("wifiscan::done", process_wifi_list)
+wifi:connect_signal("wifi::scan_done", process_wifi_list)
 
 local function toggle()
     popup_container.visible = not popup_container.visible
 
     if popup_container.visible then
-        wifilist_ap_list:reset()
+        popup_container:move_next_to(mouse.current_widget_geometry)
         local active = wifi:get_active_ap()
-        if active then
-            wifilist_active_ap:reset()
-            wifilist_active_ap:add(wifilist_ap_widget(active))
-        end
         wifilist_ap_list:reset()
+        if active then wifilist_ap_list:add(wifilist_ap_widget(active)) end
         wifi:scan()
     end
 end

@@ -1,6 +1,8 @@
 local awful = require("awful")
 local gears = require("gears")
 local wibox = require("wibox")
+-- local mouse = require("awful.mouse")
+local inspect = require("inspect")
 
 local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 
@@ -16,9 +18,16 @@ local indicator = wibox.widget({
     widget = wibox.widget.textbox,
 })
 
-local function update_indicator()
+local function update_indicator(_, data)
+    print(require("inspect")(data))
     local default_config = configuration.get()
-    local ap = wifi.get_active_ap()
+    local ap = data == nil and wifi.get_active_ap() or data
+    if data ~= nil and data.Strength ~= nil then
+        ap = {
+            strength = data.Strength,
+        }
+    end
+
     indicator:set_markup_silently(
         string.format(
             '<span font="%s">%s</span>',
@@ -47,13 +56,10 @@ local function setup(config)
         )
     )
 
-    gears.timer({
-        timeout = 5,
-        call_now = true,
-        autostart = true,
-        callback = update_indicator,
-    })
-
+    update_indicator()
+    wifi:connect_signal("wifi::ap_properties_changed", update_indicator)
+    wifi:connect_signal("wifi::activated", update_indicator)
+    wifi:connect_signal("wifi::disconnected", update_indicator)
     return applet
 end
 
