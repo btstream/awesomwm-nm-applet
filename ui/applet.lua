@@ -18,15 +18,10 @@ local indicator = wibox.widget({
     widget = wibox.widget.textbox,
 })
 
-local function update_indicator(_, data)
-    print(require("inspect")(data))
+local function update_indicator()
     local default_config = configuration.get()
-    local ap = data == nil and wifi.get_active_ap() or data
-    if data ~= nil and data.Strength ~= nil then
-        ap = {
-            strength = data.Strength,
-        }
-    end
+    local ap = wifi:get_active_ap()
+    -- print(ap.ssid .. ":" .. ap.strength)
 
     indicator:set_markup_silently(
         string.format(
@@ -57,9 +52,8 @@ local function setup(config)
     )
 
     update_indicator()
-    wifi:connect_signal("wifi::ap_properties_changed", update_indicator)
-    wifi:connect_signal("wifi::activated", update_indicator)
-    wifi:connect_signal("wifi::disconnected", update_indicator)
+    wifi:connect_signal("wifi::signal_strength_changed", update_indicator)
+    wifi:connect_signal("wifi::state_changed", update_indicator)
     return applet
 end
 

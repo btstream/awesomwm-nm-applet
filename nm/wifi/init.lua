@@ -1,9 +1,12 @@
 local gears = require("gears")
+local signal_handler_disconnect =
+    require("lgi").GObject.signal_handler_disconnect
 local inspect = require("inspect")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
-local dbus = require(tostring(...):match(".*nm_applet") .. ".nm.dbus")
+-- local dbus = require(tostring(...):match(".*nm_applet") .. ".nm.dbus")
 -- local nm = require("nm")
 local NM = nm.nm
+local nm_client = nm.client
 local devs = nm.devices
 
 ----------------------------------------------------------------------
@@ -34,42 +37,22 @@ end
 
 local function flags_to_string(flags)
     local str = ""
-    -- if comes from dbus
-    if type(flags) == "number" then
-        if flags == 1 then
-            str = str .. " " .. "PRIVACY"
-        else
-            str = "NONE"
-        end
-    else
-        for flag, _ in pairs(flags) do
-            str = str .. " " .. flag
-        end
-        if str == "" then str = "NONE" end
+    for flag, _ in pairs(flags) do
+        str = str .. " " .. flag
     end
+    if str == "" then str = "NONE" end
     return (str:gsub("^%s", ""))
 end
 
 local function flags_to_security(flags, wpa_flags, rsn_flags)
     local str = ""
-
-    -- if comes from dbus
-    if type(flags) == "number" then
-        if flags == 1 and wpa_flags == 0 and rsn_flags == 0 then
-            str = str .. " WEP"
-        end
-        if wpa_flags ~= 0 then str = str .. " WPA1" end
-        if not rsn_flags ~= 0 then str = str .. " WPA2" end
-        if wpa_flags == 512 or rsn_flags == 512 then str = str .. " 802.1X" end
-    else
-        if flags["PRIVACY"] and is_empty(wpa_flags) and is_empty(rsn_flags) then
-            str = str .. " WEP"
-        end
-        if not is_empty(wpa_flags) then str = str .. " WPA1" end
-        if not is_empty(rsn_flags) then str = str .. " WPA2" end
-        if wpa_flags["KEY_MGMT_802_1X"] or rsn_flags["KEY_MGMT_802_1X"] then
-            str = str .. " 802.1X"
-        end
+    if flags["PRIVACY"] and is_empty(wpa_flags) and is_empty(rsn_flags) then
+        str = str .. " WEP"
+    end
+    if not is_empty(wpa_flags) then str = str .. " WPA1" end
+    if not is_empty(rsn_flags) then str = str .. " WPA2" end
+    if wpa_flags["KEY_MGMT_802_1X"] or rsn_flags["KEY_MGMT_802_1X"] then
+        str = str .. " 802.1X"
     end
     return (str:gsub("^%s", ""))
 end
@@ -77,29 +60,21 @@ end
 local function parse_ap_info(ap)
     if ap == nil then return ap end
 
-    local strength = type(ap.get_strength) == "userdata" and ap:get_strength()
-        or ap.Strength
-    local frequency = type(ap.get_frequency) == "userdata"
-            and ap:get_frequency()
-        or ap.Frequency
-    local flags = type(ap.get_flags) == "userdata" and ap:get_flags()
-        or ap.Flags
-    local wpa_flags = type(ap.get_wpa_flags) == "userdata"
-            and ap:get_wpa_flags()
-        or ap.WpaFlags
-    local rsn_flags = type(ap.get_rsn_flags) == "userdata"
-            and ap:get_rsn_flags()
-        or ap.RsnFlags
+    local strength = ap:get_strength()
+    local frequency = ap:get_frequency()
+    local flags = ap:get_flags()
+    local wpa_flags = ap:get_wpa_flags()
+    local rsn_flags = ap:get_rsn_flags()
     -- remove extra NONE from the flags tables
-    if type(flags) == "table" then flags["NONE"] = nil end
-    if type(wpa_flags) == "table" then wpa_flags["NONE"] = nil end
-    if type(rsn_flags) == "table" then rsn_flags["NONE"] = nil end
+    flags["NONE"] = nil
+    wpa_flags["NONE"] = nil
+    rsn_flags["NONE"] = nil
     return {
         ssid = ssid_to_utf8(ap),
-        bssid = type(ap.get_bssid) == "userdata" and ap:get_bssid() or ap.Bssid,
+        bssid = ap:get_bssid(),
         frequency = frequency,
         channel = NM.utils_wifi_freq_to_channel(frequency),
-        mode = type(ap.get_mode) == "userdata" and ap:get_mode() or ap.Mode,
+        mode = ap:get_mode(),
         flags = flags_to_string(flags),
         wpa_flags = flags_to_string(wpa_flags),
         security = flags_to_security(flags, wpa_flags, rsn_flags),
@@ -112,9 +87,15 @@ end
 --                     NetworkManager examples                      --
 ----------------------------------------------------------------------
 
-local function for_each_wifi_dev(callback)
+local function for_each_avaiable_wifi_dev(callback)
     for _, dev in ipairs(devs) do
-        if dev:get_device_type() == "WIFI" then
+        local state = dev:get_state()
+        if
+            dev:get_device_type() == "WIFI"
+            and state ~= "UNKNOWN"
+            and state ~= "UNMANAGED"
+            and state ~= "UNAVAILABLE"
+        then
             if callback(dev) then break end
         end
     end
@@ -129,24 +110,122 @@ local function get_scan_status(dev) return dev_status[dev:get_udi()] end
 
 local M = gears.object()
 
-dbus:connect_signal(
-    "wifi::ap_properties_changed",
-    function(_, properties) M:emit_signal("wifi::ap_properties_changed", properties) end
-)
+M._private = {
+    -- primary_connection = nil,
+    active_access_point = nil,
+    active_dev = nil,
+}
 
-dbus:connect_signal(
-    "wifi::activated",
-    function() M:emit_signal("wifi::activated") end
-)
+-- wifi device event
+local function register_device_event(dev)
+    return dev.on_notify:connect(function()
+        local state = dev:get_state()
+        if
+            state == "UNKNOWN"
+            or state == "UNAVAILABLE"
+            or state == "UNMANAGED"
+        then
+            if M._private.active_dev ~= nil then
+                signal_handler_disconnect(
+                    M._private.active_dev.dev,
+                    M._private.active_dev.handler
+                )
+            end
+        end
+        M:emit_signal("wifi::state_changed")
+    end, "state")
+end
 
-dbus:connect_signal(
-    "wifi::disconnected",
-    function() M:emit_signal("wifi::disconnected") end
-)
+-- wifi accesspoint event for strength
+local function register_accesspoint_event(ap)
+    if
+        M._private.active_access_point == nil
+        or M._private.active_access_point.ssid ~= parse_ap_info(ap).ssid
+    then
+        local s = ap.on_notify:connect(
+            function() M:emit_signal("wifi::signal_strength_changed") end,
+            "strength",
+            false
+        )
+        return s
+    end
+end
+
+-- init
+local function update_active_infomation()
+    -- disconnect strength change signal
+    if M._private.active_access_point ~= nil then
+        signal_handler_disconnect(
+            M._private.active_access_point.ap,
+            M._private.active_access_point.handler
+        )
+    end
+
+    if M._private.active_dev ~= nil and M._private.handler ~= nil then
+        signal_handler_disconnect(
+            M._private.active_dev.dev,
+            M._private.active_dev.handler
+        )
+    end
+
+    local primary_connection = nm:get_primary_connection()
+    if -- if has primary_connection
+        primary_connection ~= nil
+        and primary_connection:get_connection_type() == "802-11-wireless"
+    then
+        for _, dev in ipairs(primary_connection:get_devices()) do
+            if dev:get_device_type() == "WIFI" then --should be no else
+                local active_access_point = dev:get_active_access_point()
+
+                M._private.active_access_point = {
+                    ap = active_access_point,
+                    handler = register_accesspoint_event(active_access_point),
+                }
+                M._private.active_dev =
+                    { dev = dev, handler = register_device_event(dev) }
+                return true
+            end
+        end
+    else -- no primary connection, chose first one
+        local active_access_points = {}
+        local active_devs = {}
+
+        for_each_avaiable_wifi_dev(function(dev)
+            table.insert(active_devs, dev)
+            local active_access_point = dev:get_active_access_point()
+            if active_access_point ~= nil then
+                table.insert(active_access_points, active_access_point)
+            end
+        end)
+
+        if #active_access_points ~= 0 then
+            M._private.active_access_point = {
+                ap = active_access_points[1],
+                handler = register_accesspoint_event(active_access_points[1]),
+            }
+            -- M._private.active_access_point.active = true
+        else -- no access_poin connected
+            M._private.active_access_point = nil
+        end
+
+        if #active_devs ~= 0 then
+            M._private.active_dev = {
+                active_devs[1],
+                handler = register_device_event(active_devs[1]),
+            }
+        else -- no active device
+            M._private.active_dev = nil
+        end
+    end
+    M:emit_signal("wifi::state_changed")
+end
+
+update_active_infomation()
+nm:connect_signal("nm::state_changed", update_active_infomation)
 
 function M:get_active_ap()
-    local ret = parse_ap_info(dbus.active_access_point)
-    if ret == nil then return nil end
+    if M._private.active_access_point == nil then return nil end
+    local ret = parse_ap_info(M._private.active_access_point.ap)
     ret.active = true
     return ret
 end
@@ -154,7 +233,7 @@ end
 --- get all access point informations
 function M:scan()
     local active = M:get_active_ap()
-    for_each_wifi_dev(function(dev)
+    for_each_avaiable_wifi_dev(function(dev)
         -- gears.debug.print_warning(dev:get_state())
         if dev:get_state() == "UNAVAILABLE" then return end
         local last_scan = dev:get_last_scan()
@@ -236,7 +315,7 @@ function M:get_wifilist()
     local scan_done = false
 
     local active = M:get_active_ap()
-    for_each_wifi_dev(function(dev)
+    for_each_avaiable_wifi_dev(function(dev)
         local aps = dev:get_access_points()
         if
             (aps == nil or #aps == 0) -- if does not have aps
@@ -273,4 +352,12 @@ function M:get_wifilist()
     return wifilist, scan_done
 end
 
-return M
+return setmetatable({}, {
+    __index = function(_, key)
+        if key == "_private" then
+            return nil
+        else
+            return M[key]
+        end
+    end,
+})
