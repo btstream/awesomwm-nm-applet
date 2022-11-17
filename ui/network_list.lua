@@ -1,3 +1,4 @@
+local lgi = require("lgi")
 local awful = require("awful")
 local wibox = require("wibox")
 local gears = require("gears")
@@ -105,10 +106,11 @@ local wifilist_ap_list = wibox.widget({
 local wifi_button = wibox.widget({
     widget = wibox.widget.textbox,
 })
+wifi_button.status = nm_client:wireless_get_enabled()
 
 local function update_wifi_button()
     local defaualt_config = configuration.get()
-    if nm_client:wireless_get_enabled() then
+    if wifi_button.status then
         wifi_button.markup = string.format(
             '<span font="%s" color="%s"> </span>',
             defaualt_config.wifilist_btn_font,
@@ -122,12 +124,35 @@ local function update_wifi_button()
         )
     end
 end
-update_wifi_button()
--- wifi_button:buttons(gears.table.join(awful.button({}, 1, function()
---     local wifi_enabled = nm_client:wireless_get_enabled()
---     nm_client.wireless_enabled = not wifi_enabled
--- end)))
--- nm_client.on_notify["wireless-enabled"] = function() update_wifi_button() end
+-- wifi_button:connect_signal("wifi::update_button", function() print("wokao") end)
+
+local function check_wifi_button()
+    if wifi_button.status == nm_client:wireless_get_enabled() then
+        update_wifi_button()
+        wifi:scan()
+    else
+        gears.timer({
+            single_shot = true,
+            timeout = 0.5,
+            callback = check_wifi_button,
+            autostart = true,
+        })
+    end
+end
+
+wifi_button:buttons(gears.table.join(awful.button({}, 1, function()
+    wifi_button.status = not wifi_button.status
+    nm_client:dbus_set_property(
+        "/org/freedesktop/NetworkManager",
+        "org.freedesktop.NetworkManager",
+        "WirelessEnabled",
+        lgi.GLib.Variant("b", wifi_button.status),
+        15000,
+        nil,
+        check_wifi_button
+    )
+    if not wifi_button.status then wifilist_ap_list:reset() end
+end)))
 
 local popup_container = awful.popup({
     widget = {
@@ -213,6 +238,7 @@ local function toggle()
     popup_container.visible = not popup_container.visible
 
     if popup_container.visible then
+        update_wifi_button()
         popup_container:move_next_to(mouse.current_widget_geometry)
         local active = wifi:get_active_ap()
         wifilist_ap_list:reset()

@@ -1,7 +1,7 @@
 local gears = require("gears")
 local signal_handler_disconnect =
     require("lgi").GObject.signal_handler_disconnect
--- local inspect = require("inspect")
+local inspect = require("inspect")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
 local NM = nm.nm
 -- local nm_client = nm.client
