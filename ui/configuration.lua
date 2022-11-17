@@ -11,7 +11,7 @@ local default_config = {
         or "Material Design Icons 11",
     wifilist_text_font = beautiful.nm_wifilist_text_font or beautiful.font,
     wifilist_btn_font = beautiful.nm_wifilist_btn_font
-        or "JetBrainsMono Nerd Font Mono 8",
+        or "Material Design Icons 12",
 
     active_wifi_color = beautiful.active_wifi_color or beautiful.fg_normal,
     nonactive_wifi_color = beautiful.fg_normal,

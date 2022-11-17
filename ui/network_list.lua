@@ -7,11 +7,15 @@ local dpi = require("beautiful.xresources").apply_dpi
 local overflow =
     require(tostring(...):match(".*nm_applet") .. ".ui.layouts.overflow")
 
+local nm_client = require(tostring(...):match(".*nm_applet") .. ".nm").client
 local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".ui.configuration")
 
+--- generate accesspoint row
+---@param ap table
+---@return wibox.widget
 local function wifilist_ap_widget(ap)
     if ap == nil then return nil end
 
@@ -36,7 +40,7 @@ local function wifilist_ap_widget(ap)
             top = dpi(10),
             bottom = dpi(10),
             {
-                widget = wibox.layout.align.horizontal,
+                layout = wibox.layout.align.horizontal,
                 expand = "none",
                 {
                     widget = wibox.container.margin,
@@ -83,26 +87,79 @@ local function wifilist_ap_widget(ap)
     })
 end
 
+-- overflow widget for accesspoint
 local wifilist_ap_list = wibox.widget({
     layout = overflow.vertical,
     forced_height = dpi(300),
-    -- spacing = dpi(12),
     scrollbar_widget = {
         widget = wibox.widget.separator,
         shape = function(cr, width, height, _)
             gears.shape.rounded_rect(cr, width, height, dpi(15))
         end,
     },
-    scrollbar_width = dpi(4),
+    scrollbar_width = dpi(2),
     step = 50,
 })
+
+-- button to toggle wifi
+local wifi_button = wibox.widget({
+    widget = wibox.widget.textbox,
+})
+
+local function update_wifi_button()
+    local defaualt_config = configuration.get()
+    if nm_client:wireless_get_enabled() then
+        wifi_button.markup = string.format(
+            '<span font="%s" color="%s"> </span>',
+            defaualt_config.wifilist_btn_font,
+            defaualt_config.active_wifi_color
+        )
+    else
+        wifi_button.markup = string.format(
+            '<span font="%s" color="%s"> </span>',
+            defaualt_config.wifilist_btn_font,
+            beautiful.fg_normal
+        )
+    end
+end
+update_wifi_button()
+-- wifi_button:buttons(gears.table.join(awful.button({}, 1, function()
+--     local wifi_enabled = nm_client:wireless_get_enabled()
+--     nm_client.wireless_enabled = not wifi_enabled
+-- end)))
+-- nm_client.on_notify["wireless-enabled"] = function() update_wifi_button() end
 
 local popup_container = awful.popup({
     widget = {
         {
+            {
+                widget = wibox.container.margin,
+                top = dpi(10),
+                bottom = dpi(5),
+                right = dpi(13),
+                left = dpi(12),
+                {
+                    layout = wibox.layout.align.horizontal,
+                    expand = "none",
+                    wibox.widget.textbox("Wi-Fi"),
+                    nil,
+                    wifi_button,
+                },
+                -- wifi_button,
+            },
+            spacing_widget = {
+                widget = wibox.container.margin,
+                left = dpi(10),
+                right = dpi(10),
+                {
+                    widget = wibox.widget.separator,
+                    color = beautiful.border_normal,
+                    thickness = dpi(1),
+                },
+            },
             wifilist_ap_list,
             layout = wibox.layout.fixed.vertical,
-            spacing = dpi(6),
+            spacing = dpi(5),
         },
         widget = wibox.container.margin,
         -- top = beautiful.systray_icon_spacing * 2,
