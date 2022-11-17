@@ -1,12 +1,10 @@
 local gears = require("gears")
 local signal_handler_disconnect =
     require("lgi").GObject.signal_handler_disconnect
-local inspect = require("inspect")
+-- local inspect = require("inspect")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
--- local dbus = require(tostring(...):match(".*nm_applet") .. ".nm.dbus")
--- local nm = require("nm")
 local NM = nm.nm
-local nm_client = nm.client
+-- local nm_client = nm.client
 local devs = nm.devices
 
 ----------------------------------------------------------------------
@@ -111,30 +109,8 @@ local function get_scan_status(dev) return dev_status[dev:get_udi()] end
 local M = gears.object()
 
 M._private = {
-    -- primary_connection = nil,
     active_access_point = nil,
-    active_dev = nil,
 }
-
--- wifi device event
-local function register_device_event(dev)
-    return dev.on_notify:connect(function()
-        local state = dev:get_state()
-        if
-            state == "UNKNOWN"
-            or state == "UNAVAILABLE"
-            or state == "UNMANAGED"
-        then
-            if M._private.active_dev ~= nil then
-                signal_handler_disconnect(
-                    M._private.active_dev.dev,
-                    M._private.active_dev.handler
-                )
-            end
-        end
-        M:emit_signal("wifi::state_changed")
-    end, "state")
-end
 
 -- wifi accesspoint event for strength
 local function register_accesspoint_event(ap)
@@ -161,31 +137,30 @@ local function update_active_infomation()
         )
     end
 
-    if M._private.active_dev ~= nil and M._private.handler ~= nil then
-        signal_handler_disconnect(
-            M._private.active_dev.dev,
-            M._private.active_dev.handler
-        )
-    end
+    -- if M._private.active_dev ~= nil and M._private.handler ~= nil then
+    --     signal_handler_disconnect(
+    --         M._private.active_dev.dev,
+    --         M._private.active_dev.handler
+    --     )
+    -- end
 
     local primary_connection = nm:get_primary_connection()
     if -- if has primary_connection
         primary_connection ~= nil
-        and primary_connection:get_connection_type() == "802-11-wireless"
     then
+        local find_wifi = false
         for _, dev in ipairs(primary_connection:get_devices()) do
-            if dev:get_device_type() == "WIFI" then --should be no else
+            if dev:get_device_type() == "WIFI" then --if there is an wifi connected
                 local active_access_point = dev:get_active_access_point()
 
                 M._private.active_access_point = {
                     ap = active_access_point,
                     handler = register_accesspoint_event(active_access_point),
                 }
-                M._private.active_dev =
-                    { dev = dev, handler = register_device_event(dev) }
-                return true
+                find_wifi = true
             end
         end
+        if not find_wifi then M._private.active_access_point = nil end
     else -- no primary connection, chose first one
         local active_access_points = {}
         local active_devs = {}
@@ -203,25 +178,21 @@ local function update_active_infomation()
                 ap = active_access_points[1],
                 handler = register_accesspoint_event(active_access_points[1]),
             }
-            -- M._private.active_access_point.active = true
         else -- no access_poin connected
             M._private.active_access_point = nil
         end
-
-        if #active_devs ~= 0 then
-            M._private.active_dev = {
-                active_devs[1],
-                handler = register_device_event(active_devs[1]),
-            }
-        else -- no active device
-            M._private.active_dev = nil
-        end
     end
-    M:emit_signal("wifi::state_changed")
 end
 
 update_active_infomation()
 nm:connect_signal("nm::state_changed", update_active_infomation)
+for_each_avaiable_wifi_dev(function(dev)
+    return dev.on_notify:connect(function()
+        local state = dev:get_state()
+        update_active_infomation()
+        M:emit_signal("wifi::state_changed", state)
+    end, "state")
+end)
 
 function M:get_active_ap()
     if M._private.active_access_point == nil then return nil end
@@ -234,8 +205,6 @@ end
 function M:scan()
     local active = M:get_active_ap()
     for_each_avaiable_wifi_dev(function(dev)
-        -- gears.debug.print_warning(dev:get_state())
-        if dev:get_state() == "UNAVAILABLE" then return end
         local last_scan = dev:get_last_scan()
         local timeout = NM.utils_get_timestamp_msec() - last_scan
 
@@ -248,15 +217,6 @@ function M:scan()
                 and #aps == 1
                 and parse_ap_info(aps[1]) == active.ssid
             )
-
-        -- gears.debug.print_warning(
-        --     string.format(
-        --         "scan condition %s, %s, %s",
-        --         last_scan < 0,
-        --         only_active,
-        --         timeout >= 15000
-        --     )
-        -- )
 
         if last_scan < 0 or only_active or timeout >= 15000 then
             dev_status[dev:get_udi()] = "SCANNING"

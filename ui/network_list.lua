@@ -21,48 +21,53 @@ local function wifilist_ap_widget(ap)
     if ap.active then wifi_color = defaualt_config.active_wifi_color end
     local wifi_lock = ap.wpa_flags == " " or ""
 
+    local ssid = ap.ssid
+    if #ssid >= 20 then ssid = ssid:sub(1, 20) .. "..." end
+
     local r = wibox.widget({
         widget = wibox.container.background,
+        shape = function(cr, width, height)
+            gears.shape.rounded_rect(cr, width, height, dpi(5))
+        end,
         {
-            widget = wibox.layout.align.horizontal,
-            expand = "none",
+            widget = wibox.container.margin,
+            left = dpi(10),
+            right = dpi(10),
+            top = dpi(10),
+            bottom = dpi(10),
             {
-                widget = wibox.container.margin,
-                top = dpi(5),
-                bottom = dpi(5),
-                left = beautiful.systray_icon_spacing * 3,
-                right = beautiful.systray_icon_spacing * 3,
+                widget = wibox.layout.align.horizontal,
+                expand = "none",
                 {
-                    widget = wibox.widget.textbox,
-                    markup = string.format(
-                        '<span font="%s" color="%s">%s</span>   <span font="%s">%s</span>',
-                        defaualt_config.wifilist_icon_font,
-                        wifi_color,
-                        wifi_icon,
-                        defaualt_config.wifilist_text_font,
-                        ap.ssid
-                    ),
-                    align = "center",
-                    valign = "center",
+                    widget = wibox.container.margin,
+                    {
+                        widget = wibox.widget.textbox,
+                        markup = string.format(
+                            '<span font="%s" color="%s">%s</span>   <span font="%s">%s</span>',
+                            defaualt_config.wifilist_icon_font,
+                            wifi_color,
+                            wifi_icon,
+                            defaualt_config.wifilist_text_font,
+                            ssid
+                        ),
+                        align = "center",
+                        valign = "center",
+                    },
                 },
-            },
-            nil,
-            {
-                widget = wibox.container.margin,
-                top = dpi(5),
-                bottom = dpi(5),
-                left = beautiful.systray_icon_spacing * 3,
-                right = beautiful.systray_icon_spacing * 3,
+                nil,
                 {
-                    widget = wibox.widget.textbox,
-                    align = "center",
-                    valign = "center",
-                    markup = string.format(
-                        '<span font="%s %s">%s</span>',
-                        defaualt_config.applet_icon_font,
-                        defaualt_config.wifilist_icon_size,
-                        wifi_lock
-                    ),
+                    widget = wibox.container.margin,
+                    {
+                        widget = wibox.widget.textbox,
+                        align = "center",
+                        valign = "center",
+                        markup = string.format(
+                            '<span font="%s %s">%s</span>',
+                            defaualt_config.applet_icon_font,
+                            defaualt_config.wifilist_icon_size,
+                            wifi_lock
+                        ),
+                    },
                 },
             },
         },
@@ -70,13 +75,18 @@ local function wifilist_ap_widget(ap)
     r:connect_signal("mouse::enter", function(r) r.bg = beautiful.bg_focus end)
     r:connect_signal("mouse::leave", function(r) r.bg = beautiful.bg_normal end)
     r.active = ap.active
-    return r
+    return wibox.widget({
+        widget = wibox.container.margin,
+        left = dpi(3),
+        right = dpi(3),
+        r,
+    })
 end
 
 local wifilist_ap_list = wibox.widget({
     layout = overflow.vertical,
     forced_height = dpi(300),
-    spacing = dpi(6),
+    -- spacing = dpi(12),
     scrollbar_widget = {
         widget = wibox.widget.separator,
         shape = function(cr, width, height, _)
@@ -95,8 +105,8 @@ local popup_container = awful.popup({
             spacing = dpi(6),
         },
         widget = wibox.container.margin,
-        top = beautiful.systray_icon_spacing * 2,
-        bottom = beautiful.systray_icon_spacing * 2,
+        -- top = beautiful.systray_icon_spacing * 2,
+        -- bottom = beautiful.systray_icon_spacing * 2,
     },
     ontop = true,
     visible = false,
@@ -152,6 +162,8 @@ local function toggle()
         if active then wifilist_ap_list:add(wifilist_ap_widget(active)) end
         wifi:scan()
     end
+
+    return popup_container.visible
 end
 
 return {

@@ -1,7 +1,7 @@
 local awful = require("awful")
+local beautiful = require("beautiful")
 local gears = require("gears")
 local wibox = require("wibox")
--- local mouse = require("awful.mouse")
 local inspect = require("inspect")
 
 local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
@@ -39,17 +39,23 @@ local function setup(config)
     local default_config = configuration.get(config)
 
     local applet = wibox.widget({
-        indicator,
-        left = default_config.left,
-        right = default_config.right,
-        widget = wibox.container.margin,
+        {
+            indicator,
+            left = default_config.left,
+            right = default_config.right,
+            widget = wibox.container.margin,
+        },
+        bg = beautiful.bg_normal,
+        widget = wibox.container.background,
     })
 
-    applet:buttons(
-        gears.table.join(
-            awful.button({}, 1, function() network_list.toggle() end)
-        )
-    )
+    applet:buttons(gears.table.join(awful.button({}, 1, function()
+        if network_list.toggle() then
+            applet.bg = beautiful.bg_focus
+        else
+            applet.bg = beautiful.bg_normal
+        end
+    end)))
 
     update_indicator()
     wifi:connect_signal("wifi::signal_strength_changed", update_indicator)
