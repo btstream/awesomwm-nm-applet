@@ -114,78 +114,57 @@ M._private = {
 
 -- wifi accesspoint event for strength
 local function register_accesspoint_event(ap)
-    if
-        M._private.active_access_point == nil
-        or M._private.active_access_point.ssid ~= parse_ap_info(ap).ssid
-    then
-        local s = ap.on_notify:connect(
-            function() M:emit_signal("wifi::signal_strength_changed") end,
-            "strength",
-            false
-        )
-        return s
-    end
+    return ap.on_notify:connect(
+        function() M:emit_signal("wifi::signal_strength_changed") end,
+        "strength",
+        false
+    )
 end
 
 -- init
 local function update_active_infomation()
     -- disconnect strength change signal
-    if M._private.active_access_point ~= nil then
-        signal_handler_disconnect(
-            M._private.active_access_point.ap,
-            M._private.active_access_point.handler
-        )
-    end
+    local active_access_points = {}
 
-    -- if M._private.active_dev ~= nil and M._private.handler ~= nil then
-    --     signal_handler_disconnect(
-    --         M._private.active_dev.dev,
-    --         M._private.active_dev.handler
-    --     )
-    -- end
-
-    local primary_connection = nm:get_primary_connection()
-    if -- if has primary_connection
-        primary_connection ~= nil
-    then
-        local find_wifi = false
-        for _, dev in ipairs(primary_connection:get_devices()) do
-            if dev:get_device_type() == "WIFI" then --if there is an wifi connected
-                local active_access_point = dev:get_active_access_point()
-
-                M._private.active_access_point = {
-                    ap = active_access_point,
-                    handler = register_accesspoint_event(active_access_point),
-                }
-                find_wifi = true
-            end
+    for_each_avaiable_wifi_dev(function(dev)
+        local active_access_point = dev:get_active_access_point()
+        if active_access_point ~= nil then
+            table.insert(active_access_points, active_access_point)
         end
-        if not find_wifi then M._private.active_access_point = nil end
-    else -- no primary connection, chose first one
-        local active_access_points = {}
-        local active_devs = {}
+    end)
 
-        for_each_avaiable_wifi_dev(function(dev)
-            table.insert(active_devs, dev)
-            local active_access_point = dev:get_active_access_point()
-            if active_access_point ~= nil then
-                table.insert(active_access_points, active_access_point)
+    if #active_access_points >= 1 then
+        local new_active_ap = active_access_points[1]
+
+        if -- if there is no active access point exists or connected to a active access point
+            M._private.active_access_point == nil
+            or M._private.active_access_point.ap ~= new_active_ap
+        then
+            if M._private.active_access_point ~= nil then
+                signal_handler_disconnect(
+                    M._private.active_access_point.ap,
+                    M._private.active_access_point.handler
+                )
             end
-        end)
-
-        if #active_access_points ~= 0 then
+            local handler = register_accesspoint_event(new_active_ap)
             M._private.active_access_point = {
-                ap = active_access_points[1],
-                handler = register_accesspoint_event(active_access_points[1]),
+                ap = new_active_ap,
+                handler = handler,
             }
-        else -- no access_poin connected
-            M._private.active_access_point = nil
         end
+    else -- disconnect from current access point
+        if M._private.active_access_point ~= nil then
+            signal_handler_disconnect(
+                M._private.active_access_point.ap,
+                M._private.active_access_point.handler
+            )
+        end
+        M._private.active_access_point = nil
     end
 end
 
 update_active_infomation()
-nm:connect_signal("nm::state_changed", update_active_infomation)
+-- nm:connect_signal("nm::state_changed", update_active_infomation)
 for_each_avaiable_wifi_dev(function(dev)
     return dev.on_notify:connect(function()
         local state = dev:get_state()

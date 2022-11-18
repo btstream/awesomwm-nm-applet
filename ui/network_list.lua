@@ -14,7 +14,7 @@ local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".ui.configuration")
 
---- generate accesspoint row
+--- hleper function to generate accesspoint row
 ---@param ap table
 ---@return wibox.widget
 local function wifilist_ap_widget(ap)
@@ -27,7 +27,7 @@ local function wifilist_ap_widget(ap)
     local wifi_lock = ap.wpa_flags == " " or ""
 
     local ssid = ap.ssid
-    if #ssid >= 20 then ssid = ssid:sub(1, 20) .. "..." end
+    if #ssid >= 25 then ssid = ssid:sub(1, 20) .. "..." end
 
     local r = wibox.widget({
         widget = wibox.container.background,
@@ -79,16 +79,18 @@ local function wifilist_ap_widget(ap)
     })
     r:connect_signal("mouse::enter", function(r) r.bg = beautiful.bg_focus end)
     r:connect_signal("mouse::leave", function(r) r.bg = beautiful.bg_normal end)
-    r.active = ap.active
-    return wibox.widget({
+    -- r.active = ap.active
+    local ret = wibox.widget({
         widget = wibox.container.margin,
         left = dpi(3),
         right = dpi(3),
         r,
     })
+    ret.active = ap.active
+    return ret
 end
 
--- overflow widget for accesspoint
+-- overflow widget for accesspoint list
 local wifilist_ap_list = wibox.widget({
     layout = overflow.vertical,
     forced_height = dpi(300),
@@ -102,7 +104,10 @@ local wifilist_ap_list = wibox.widget({
     step = 50,
 })
 
--- button to toggle wifi
+----------------------------------------------------------------------
+--                       A wifi toggle button                       --
+----------------------------------------------------------------------
+
 local wifi_button = wibox.widget({
     widget = wibox.widget.textbox,
 })
@@ -154,6 +159,9 @@ wifi_button:buttons(gears.table.join(awful.button({}, 1, function()
     if not wifi_button.status then wifilist_ap_list:reset() end
 end)))
 
+----------------------------------------------------------------------
+--                            Popup menu                            --
+----------------------------------------------------------------------
 local popup_container = awful.popup({
     widget = {
         {
@@ -201,6 +209,10 @@ local popup_container = awful.popup({
     border_width = dpi(1),
 })
 
+----------------------------------------------------------------------
+--          helper function to append data to access point          --
+--                               list                               --
+----------------------------------------------------------------------
 local function process_wifi_list()
     local active = wifi:get_active_ap()
     local wifilist, scan_done = wifi:get_wifilist()
@@ -233,7 +245,22 @@ local function process_wifi_list()
 end
 
 wifi:connect_signal("wifi::scan_done", process_wifi_list)
+wifi:connect_signal("wifi::state_changed", function()
+    local active_ap = wifi:get_active_ap()
+    if active_ap == nil then return end
 
+    local first_ap_in_list = wifilist_ap_list.all_children[1]
+    if
+        (first_ap_in_list and not first_ap_in_list.active)
+        or first_ap_in_list == nil
+    then
+        wifilist_ap_list:insert(1, wifilist_ap_widget(active_ap))
+    end
+end)
+
+----------------------------------------------------------------------
+--                        toggle popup menu                         --
+----------------------------------------------------------------------
 local function toggle()
     popup_container.visible = not popup_container.visible
 

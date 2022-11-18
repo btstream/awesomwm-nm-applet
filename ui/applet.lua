@@ -21,7 +21,6 @@ local indicator = wibox.widget({
 local function update_indicator()
     local default_config = configuration.get()
     local ap = wifi:get_active_ap()
-    -- print(ap.ssid .. ":" .. ap.strength)
 
     indicator:set_markup_silently(
         string.format(
