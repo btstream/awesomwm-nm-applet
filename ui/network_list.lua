@@ -246,6 +246,7 @@ end
 
 wifi:connect_signal("wifi::scan_done", process_wifi_list)
 wifi:connect_signal("wifi::state_changed", function()
+    if not popup_container.visible then return end
     local active_ap = wifi:get_active_ap()
     if active_ap == nil then return end
 
