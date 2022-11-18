@@ -38,8 +38,8 @@ local function wifilist_ap_widget(ap)
             widget = wibox.container.margin,
             left = dpi(10),
             right = dpi(10),
-            top = dpi(10),
-            bottom = dpi(10),
+            top = dpi(8),
+            bottom = dpi(8),
             {
                 layout = wibox.layout.align.horizontal,
                 expand = "none",
@@ -87,6 +87,7 @@ local function wifilist_ap_widget(ap)
         r,
     })
     ret.active = ap.active
+    ret.ssid = ap.ssid
     return ret
 end
 
@@ -103,7 +104,6 @@ local wifilist_ap_list = wibox.widget({
     scrollbar_width = dpi(2),
     step = 50,
 })
-
 ----------------------------------------------------------------------
 --                       A wifi toggle button                       --
 ----------------------------------------------------------------------
@@ -227,7 +227,7 @@ local function process_wifi_list()
             )
         ) and not scan_done
     then
-        gears.debug.print_warning("schedule to reget wifilist")
+        -- gears.debug.print_warning("schedule to reget wifilist")
         gears.timer({
             callback = process_wifi_list,
             single_shot = true,
@@ -235,7 +235,7 @@ local function process_wifi_list()
             autostart = true,
         })
     else
-        gears.debug.print_warning(#wifilist)
+        -- gears.debug.print_warning(#wifilist)
         for _, ap in ipairs(wifilist) do
             if not (active and active.ssid == ap.ssid) then
                 wifilist_ap_list:add(wifilist_ap_widget(ap))
@@ -254,7 +254,10 @@ wifi:connect_signal("wifi::state_changed", function()
         (first_ap_in_list and not first_ap_in_list.active)
         or first_ap_in_list == nil
     then
-        wifilist_ap_list:insert(1, wifilist_ap_widget(active_ap))
+        -- wifilist_ap_list:insert(1, wifilist_ap_widget(active_ap))
+        wifilist_ap_list:reset()
+        wifilist_ap_list:add(wifilist_ap_widget(active_ap))
+        wifi:scan()
     end
 end)
 

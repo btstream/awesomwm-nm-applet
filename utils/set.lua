@@ -26,6 +26,11 @@ function M:elements() return self._private.data end
 
 function M:has(element) return self._private.key[self.hash_func(element)] end
 
+function M:reset()
+    self._private.key = {}
+    self._private.data = {}
+end
+
 local function new(hash_func)
     local d = {
         hash_func = hash_func == nil and tostring or hash_func,
@@ -35,7 +40,8 @@ local function new(hash_func)
         },
     }
 
-    return setmetatable(d, M)
+    setmetatable(d, M)
+    return d
 end
 
 return {

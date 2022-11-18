@@ -2,6 +2,8 @@ local gears = require("gears")
 local signal_handler_disconnect =
     require("lgi").GObject.signal_handler_disconnect
 local inspect = require("inspect")
+
+local Set = require(tostring(...):match(".*nm_applet") .. ".utils.set")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
 local NM = nm.nm
 -- local nm_client = nm.client
@@ -110,6 +112,7 @@ local M = gears.object()
 
 M._private = {
     active_access_point = nil,
+    access_points = Set.new(function(ap) return ap.ssid end),
 }
 
 -- wifi accesspoint event for strength
@@ -198,6 +201,7 @@ function M:scan()
             )
 
         if last_scan < 0 or only_active or timeout >= 15000 then
+            M._private.access_points:reset()
             dev_status[dev:get_udi()] = "SCANNING"
             dev:request_scan_async(nil, function(d, result)
                 local ok, err = d:request_scan_finish(result)
@@ -221,11 +225,11 @@ function M:scan()
                             and parse_ap_info(aps[1]).ssid == active.ssid
                         )
                     then
-                        gears.debug.print_warning(
-                            "nm-applet: wifi scan does not get any result, scheduled to rescan"
-                        )
+                        -- gears.debug.print_warning(
+                        --     "nm-applet: wifi scan does not get any result, scheduled to rescan"
+                        -- )
                         gears.timer({
-                            timeout = 3,
+                            timeout = 0.5,
                             single_shot = true,
                             callback = function() M:scan() end,
                             autostart = true,
@@ -237,20 +241,20 @@ function M:scan()
                     self:emit_signal("wifi::scan_done")
                 else
                     dev_status[dev:get_udi()] = "ERROR"
-                    gears.debug.print_error(
-                        string.format("nm-applet: get scanning errors, %s", err)
-                    )
+                    -- gears.debug.print_error(
+                    --     string.format("nm-applet: get scanning errors, %s", err)
+                    -- )
                 end
             end)
         else
-            gears.debug.print_warning("already scanned, do not scan right now")
+            -- gears.debug.print_warning("already scanned, do not scan right now")
             self:emit_signal("wifi::scan_done")
         end
     end)
 end
 
 function M:get_wifilist()
-    local wifilist = {}
+    -- local wifilist = {}
     local scan_done = false
 
     local active = M:get_active_ap()
@@ -279,7 +283,8 @@ function M:get_wifilist()
                     goto continue
                 end
 
-                table.insert(wifilist, info)
+                (M._private.access_points):add(info)
+                -- table.insert(wifilist, info)
 
                 ::continue::
             end
@@ -287,8 +292,11 @@ function M:get_wifilist()
         end
     end)
 
-    table.sort(wifilist, function(a, b) return a.strength > b.strength end)
-    return wifilist, scan_done
+    table.sort(
+        M._private.access_points:elements(),
+        function(a, b) return a.strength > b.strength end
+    )
+    return M._private.access_points:elements(), scan_done
 end
 
 return setmetatable({}, {
