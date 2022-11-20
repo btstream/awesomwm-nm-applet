@@ -2,7 +2,6 @@ local awful = require("awful")
 local beautiful = require("beautiful")
 local gears = require("gears")
 local wibox = require("wibox")
-local inspect = require("inspect")
 
 local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 
@@ -38,12 +37,7 @@ local function setup(config)
     local default_config = configuration.get(config)
 
     local applet = wibox.widget({
-        {
-            indicator,
-            left = default_config.left,
-            right = default_config.right,
-            widget = wibox.container.margin,
-        },
+        indicator,
         bg = beautiful.bg_normal,
         widget = wibox.container.background,
     })

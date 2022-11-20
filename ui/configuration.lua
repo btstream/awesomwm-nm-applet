@@ -1,10 +1,8 @@
 local beautiful = require("beautiful")
 local gears = require("gears")
-local dpi = require("beautiful.xresources").apply_dpi
+-- local dpi = require("beautiful.xresources").apply_dpi
 
 local default_config = {
-    left = beautiful.systray_icon_spacing or dpi(5),
-    right = beautiful.systray_icon_spacing or dpi(5),
     applet_icon_font = beautiful.nm_applet_icon_font
         or "Material Design Icons 12",
     wifilist_icon_font = beautiful.nm_wifilist_icon_font

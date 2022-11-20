@@ -24,7 +24,7 @@ local function wifilist_ap_widget(ap)
     local wifi_icon = icons.get_wifi_icon(ap)
     local wifi_color = defaualt_config.nonactive_wifi_color
     if ap.active then wifi_color = defaualt_config.active_wifi_color end
-    local wifi_lock = ap.wpa_flags == " " or ""
+    local wifi_lock = ap.wpa_flags == " " or " "
 
     local ssid = ap.ssid
     if #ssid >= 25 then ssid = ssid:sub(1, 20) .. "..." end
@@ -207,6 +207,7 @@ local popup_container = awful.popup({
     maximum_width = dpi(240),
     border_color = beautiful.border_normal,
     border_width = dpi(1),
+    type = "menu",
 })
 
 ----------------------------------------------------------------------
