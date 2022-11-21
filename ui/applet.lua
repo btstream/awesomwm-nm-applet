@@ -37,7 +37,12 @@ local function setup(config)
     local default_config = configuration.get(config)
 
     local applet = wibox.widget({
-        indicator,
+        {
+            indicator,
+            left = default_config.margin_left,
+            right = default_config.margin_right,
+            widget = wibox.container.margin,
+        },
         bg = beautiful.bg_normal,
         widget = wibox.container.background,
     })

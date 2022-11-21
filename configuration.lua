@@ -11,6 +11,12 @@ local default_config = {
     wifilist_btn_font = beautiful.nm_wifilist_btn_font
         or "Material Design Icons 12",
 
+    margin_left = beautiful.nm_applet_margin_left
+        or beautiful.systray_icon_spacing / 2,
+
+    margin_right = beautiful.nm_applet_margin_right
+        or beautiful.systray_icon_spacing / 2,
+
     active_wifi_color = beautiful.active_wifi_color or beautiful.fg_normal,
     nonactive_wifi_color = beautiful.fg_normal,
 
