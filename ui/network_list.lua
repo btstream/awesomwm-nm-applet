@@ -12,7 +12,7 @@ local nm_client = require(tostring(...):match(".*nm_applet") .. ".nm").client
 local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
 local configuration =
-    require(tostring(...):match(".*nm_applet") .. ".ui.configuration")
+    require(tostring(...):match(".*nm_applet") .. ".configuration")
 
 --- hleper function to generate accesspoint row
 ---@param ap table

@@ -6,7 +6,7 @@ local wibox = require("wibox")
 local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 
 local configuration =
-    require(tostring(...):match(".*nm_applet.ui") .. ".configuration")
+    require(tostring(...):match(".*nm_applet") .. ".configuration")
 local icons = require(tostring(...):match(".*nm_applet.ui") .. ".icons")
 local network_list =
     require(tostring(...):match(".*nm_applet.ui") .. ".network_list")

@@ -2,7 +2,7 @@ local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
 local client = nm.client
 
 local configurations =
-    require(tostring(...):match(".*nm_applet.ui") .. ".configuration")
+    require(tostring(...):match(".*nm_applet") .. ".configuration")
 
 local M = {}
 
