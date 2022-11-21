@@ -13,7 +13,7 @@ function M.get_wifi_icon(ap)
     if ap == nil then
         icon = default_config.icons.disconnected
     else
-        local strength = ap.strength
+        local strength = ap:get_strength()
         if strength < 20 then
             icon = default_config.icons.strength1
         elseif strength >= 20 and strength < 40 then

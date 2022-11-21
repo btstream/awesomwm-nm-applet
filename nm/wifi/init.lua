@@ -3,7 +3,8 @@ local signal_handler_disconnect =
     require("lgi").GObject.signal_handler_disconnect
 local inspect = require("inspect")
 
-local Set = require(tostring(...):match(".*nm_applet") .. ".utils.set")
+local Set =
+    require(tostring(...):match(".*nm_applet") .. ".utils.ordered_key_set")
 local nm = require(tostring(...):match(".*nm_applet") .. ".nm")
 local NM = nm.nm
 -- local nm_client = nm.client
@@ -112,7 +113,10 @@ local M = gears.object()
 
 M._private = {
     active_access_point = nil,
-    access_points = Set.new(function(ap) return ap.ssid end),
+    access_points = Set.new(function(ap)
+        local ssid = parse_ap_info(ap).ssid
+        return ssid
+    end),
 }
 
 -- wifi accesspoint event for strength
@@ -177,15 +181,19 @@ for_each_avaiable_wifi_dev(function(dev)
 end)
 
 function M:get_active_ap()
-    if M._private.active_access_point == nil then return nil end
-    local ret = parse_ap_info(M._private.active_access_point.ap)
-    ret.active = true
-    return ret
+    if M._private.active_access_point == nil then
+        return nil
+    else
+        return M._private.active_access_point.ap
+    end
+    -- local ret = parse_ap_info(M._private.active_access_point.ap)
+    -- ret.active = true
+    -- return ret
 end
 
 --- get all access point informations
 function M:scan()
-    local active = M:get_active_ap()
+    local active = parse_ap_info(M:get_active_ap())
     for_each_avaiable_wifi_dev(function(dev)
         local last_scan = dev:get_last_scan()
         local timeout = NM.utils_get_timestamp_msec() - last_scan
@@ -257,7 +265,7 @@ function M:get_wifilist()
     -- local wifilist = {}
     local scan_done = false
 
-    local active = M:get_active_ap()
+    local active = parse_ap_info(M:get_active_ap())
     for_each_avaiable_wifi_dev(function(dev)
         local aps = dev:get_access_points()
         if
@@ -283,7 +291,7 @@ function M:get_wifilist()
                     goto continue
                 end
 
-                (M._private.access_points):add(info)
+                (M._private.access_points):add(ap)
                 -- table.insert(wifilist, info)
 
                 ::continue::
@@ -294,10 +302,12 @@ function M:get_wifilist()
 
     table.sort(
         M._private.access_points:elements(),
-        function(a, b) return a.strength > b.strength end
+        function(a, b) return a:get_strength() > b:get_strength() end
     )
     return M._private.access_points:elements(), scan_done
 end
+
+M.parse_ap_info = parse_ap_info
 
 return setmetatable({}, {
     __index = function(_, key)

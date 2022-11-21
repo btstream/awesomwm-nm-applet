@@ -5,6 +5,8 @@ local gears = require("gears")
 local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
 
+local NM = require(tostring(...):match(".*nm_applet") .. ".nm").nm
+
 local overflow =
     require(tostring(...):match(".*nm_applet") .. ".ui.layouts.overflow")
 
@@ -17,16 +19,19 @@ local configuration =
 --- hleper function to generate accesspoint row
 ---@param ap table
 ---@return wibox.widget
-local function wifilist_ap_widget(ap)
+local function wifilist_ap_widget(ap, active)
     if ap == nil then return nil end
 
     local defaualt_config = configuration.get()
     local wifi_icon = icons.get_wifi_icon(ap)
     local wifi_color = defaualt_config.nonactive_wifi_color
-    if ap.active then wifi_color = defaualt_config.active_wifi_color end
+    if active then wifi_color = defaualt_config.active_wifi_color end
     local wifi_lock = ap.wpa_flags == " " or " "
 
-    local ssid = ap.ssid
+    local ssid_data = ap:get_ssid()
+    -- print(require("inspect")(ssid_data))
+
+    local ssid = NM.utils_ssid_to_utf8((ap:get_ssid()):get_data())
     if #ssid >= 25 then ssid = ssid:sub(1, 20) .. "..." end
 
     local r = wibox.widget({
@@ -86,8 +91,8 @@ local function wifilist_ap_widget(ap)
         right = dpi(3),
         r,
     })
-    ret.active = ap.active
-    ret.ssid = ap.ssid
+    ret.active = active
+    ret.ssid = ssid
     return ret
 end
 
@@ -224,7 +229,8 @@ local function process_wifi_list()
             or (
                 #wifilist == 1
                 and active ~= nil
-                and wifilist[1].ssid == active.ssid
+                and wifi.parse_ap_info(wifilist[1]).ssid
+                    == wifi.parse_ap_info(active.ssid)
             )
         ) and not scan_done
     then
@@ -258,7 +264,7 @@ wifi:connect_signal("wifi::state_changed", function()
     then
         -- wifilist_ap_list:insert(1, wifilist_ap_widget(active_ap))
         wifilist_ap_list:reset()
-        wifilist_ap_list:add(wifilist_ap_widget(active_ap))
+        wifilist_ap_list:add(wifilist_ap_widget(active_ap, true))
         wifi:scan()
     end
 end)
@@ -274,7 +280,9 @@ local function toggle()
         popup_container:move_next_to(mouse.current_widget_geometry)
         local active = wifi:get_active_ap()
         wifilist_ap_list:reset()
-        if active then wifilist_ap_list:add(wifilist_ap_widget(active)) end
+        if active then
+            wifilist_ap_list:add(wifilist_ap_widget(active, true))
+        end
         wifi:scan()
     end
 
