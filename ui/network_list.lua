@@ -28,7 +28,7 @@ local function wifilist_ap_widget(ap, active)
     if active then wifi_color = defaualt_config.active_wifi_color end
     local wifi_lock = ap.wpa_flags == " " or " "
 
-    local ssid_data = ap:get_ssid()
+    -- local ssid_data = ap:get_ssid()
     -- print(require("inspect")(ssid_data))
 
     local ssid = NM.utils_ssid_to_utf8((ap:get_ssid()):get_data())
