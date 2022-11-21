@@ -6,13 +6,15 @@ local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
 
 local NM = require(tostring(...):match(".*nm_applet") .. ".nm").nm
+local nm_client = require(tostring(...):match(".*nm_applet") .. ".nm").client
+
+local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 
 local overflow =
     require(tostring(...):match(".*nm_applet") .. ".ui.layouts.overflow")
-
-local nm_client = require(tostring(...):match(".*nm_applet") .. ".nm").client
-local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
+local prompt = require(tostring(...):match(".*nm_applet") .. ".ui.prompt")
+
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".configuration")
 
@@ -29,7 +31,6 @@ local function wifilist_ap_widget(ap, active)
     local wifi_lock = ap.wpa_flags == " " or " "
 
     -- local ssid_data = ap:get_ssid()
-    -- print(require("inspect")(ssid_data))
 
     local ssid = NM.utils_ssid_to_utf8((ap:get_ssid()):get_data())
     if #ssid >= 25 then ssid = ssid:sub(1, 20) .. "..." end
@@ -84,6 +85,11 @@ local function wifilist_ap_widget(ap, active)
     })
     r:connect_signal("mouse::enter", function(r) r.bg = beautiful.bg_focus end)
     r:connect_signal("mouse::leave", function(r) r.bg = beautiful.bg_normal end)
+
+    r:buttons(
+        gears.table.join(awful.button({}, 1, function() prompt.toggle() end))
+    )
+
     -- r.active = ap.active
     local ret = wibox.widget({
         widget = wibox.container.margin,
@@ -244,7 +250,13 @@ local function process_wifi_list()
     else
         -- gears.debug.print_warning(#wifilist)
         for _, ap in ipairs(wifilist) do
-            if not (active and active.ssid == ap.ssid) then
+            if
+                not (
+                    active
+                    and wifi.parse_ap_info(active).ssid
+                        == wifi.parse_ap_info(ap).ssid
+                )
+            then
                 wifilist_ap_list:add(wifilist_ap_widget(ap))
             end
         end

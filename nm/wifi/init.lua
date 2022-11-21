@@ -287,7 +287,7 @@ function M:get_wifilist()
                 --     goto continue
                 -- end
 
-                if info.ssid == "" then
+                if ap:get_ssid() == nil or info.ssid == "" then
                     goto continue
                 end
 
