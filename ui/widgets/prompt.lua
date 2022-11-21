@@ -301,12 +301,7 @@ local function prompt_text_with_cursor(args)
         text_start, text_end = args.highlighter(text_start, text_end)
     end
 
-    print(args.password)
-
-    if args.password then
-        text_start = string.rep("*", #text_start)
-        -- char = string.rep("*", #char)
-    end
+    if args.password then text_start = string.rep("●", #text_start) end
 
     ret = _prompt
         .. text_start

@@ -13,10 +13,13 @@ local wifi = require(tostring(...):match(".*nm_applet") .. ".nm.wifi")
 local overflow =
     require(tostring(...):match(".*nm_applet") .. ".ui.layouts.overflow")
 local icons = require(tostring(...):match(".*nm_applet") .. ".ui.icons")
-local prompt = require(tostring(...):match(".*nm_applet") .. ".ui.prompt")
+-- local prompt = require(tostring(...):match(".*nm_applet") .. ".ui.prompt")
 
 local configuration =
     require(tostring(...):match(".*nm_applet") .. ".configuration")
+
+local M = gears.object()
+local widget = {}
 
 --- hleper function to generate accesspoint row
 ---@param ap table
@@ -86,9 +89,11 @@ local function wifilist_ap_widget(ap, active)
     r:connect_signal("mouse::enter", function(r) r.bg = beautiful.bg_focus end)
     r:connect_signal("mouse::leave", function(r) r.bg = beautiful.bg_normal end)
 
-    r:buttons(
-        gears.table.join(awful.button({}, 1, function() prompt.toggle() end))
-    )
+    --
+    r:buttons(gears.table.join(awful.button({}, 1, function()
+        widget.popup_container.visible = false
+        M:emit_signal("wifi::wifilist_clicked")
+    end)))
 
     -- r.active = ap.active
     local ret = wibox.widget({
@@ -173,7 +178,7 @@ end)))
 ----------------------------------------------------------------------
 --                            Popup menu                            --
 ----------------------------------------------------------------------
-local popup_container = awful.popup({
+widget.popup_container = awful.popup({
     widget = {
         {
             {
@@ -250,14 +255,17 @@ local function process_wifi_list()
     else
         -- gears.debug.print_warning(#wifilist)
         for _, ap in ipairs(wifilist) do
-            if
-                not (
-                    active
-                    and wifi.parse_ap_info(active).ssid
-                        == wifi.parse_ap_info(ap).ssid
-                )
-            then
-                wifilist_ap_list:add(wifilist_ap_widget(ap))
+            if ap:get_ssid() then
+                if
+                    not (
+                        active
+                        and wifi.parse_ap_info(ap).ssid ~= ""
+                        and wifi.parse_ap_info(active).ssid
+                            == wifi.parse_ap_info(ap).ssid
+                    )
+                then
+                    wifilist_ap_list:add(wifilist_ap_widget(ap))
+                end
             end
         end
     end
@@ -284,7 +292,8 @@ end)
 ----------------------------------------------------------------------
 --                        toggle popup menu                         --
 ----------------------------------------------------------------------
-local function toggle()
+function M.toggle()
+    local popup_container = widget.popup_container
     popup_container.visible = not popup_container.visible
 
     if popup_container.visible then
@@ -301,6 +310,4 @@ local function toggle()
     return popup_container.visible
 end
 
-return {
-    toggle = toggle,
-}
+return M

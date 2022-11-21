@@ -47,6 +47,11 @@ local function setup(config)
         widget = wibox.container.background,
     })
 
+    network_list:connect_signal(
+        "wifi::wifilist_clicked",
+        function() applet.bg = beautiful.bg_normal end
+    )
+
     applet:buttons(gears.table.join(awful.button({}, 1, function()
         if network_list.toggle() then
             applet.bg = beautiful.bg_focus
