@@ -274,9 +274,9 @@ end
 
 wifi:connect_signal("wifi::scan_done", process_wifi_list)
 wifi:connect_signal("wifi::state_changed", function(_, state)
-    -- naughty.notify({
-    --     text = "Wifi state changed, current state is " .. state,
-    -- })
+    naughty.notify({
+        text = "Wifi state changed, current state is " .. state,
+    })
     if not widget.popup_container.visible then return end
     local active_ap = wifi:get_active_ap()
     if active_ap == nil then return end
