@@ -17,17 +17,28 @@ local indicator = wibox.widget({
     widget = wibox.widget.textbox,
 })
 
-local function update_indicator()
+local function update_indicator(_, state)
     local default_config = configuration.get()
     local ap = wifi:get_active_ap()
 
-    indicator:set_markup_silently(
-        string.format(
-            '<span font="%s">%s</span>',
-            default_config.applet_icon_font,
-            icons.get_wifi_icon(ap)
-        )
-    )
+    local icon = icons.get_wifi_icon(ap)
+    if
+        state == "PREPARE"
+        or state == "CONFIG"
+        or state == "NEED_AUTH"
+        or state == "IP_CONFIG"
+        or state == "IP_CHECK"
+        or state == "SECONDARIES"
+    then
+        icon = "󰁪"
+    end
+
+    indicator:set_markup_silently(string.format(
+        '<span font="%s">%s</span>',
+        default_config.applet_icon_font,
+        icon
+        -- icons.get_wifi_icon(ap)
+    ))
 end
 
 --- setup

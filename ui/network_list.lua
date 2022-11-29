@@ -4,6 +4,7 @@ local wibox = require("wibox")
 local gears = require("gears")
 local beautiful = require("beautiful")
 local dpi = require("beautiful.xresources").apply_dpi
+local naughty = require("naughty")
 
 local NM = require(tostring(...):match(".*nm_applet") .. ".nm").nm
 local nm_client = require(tostring(...):match(".*nm_applet") .. ".nm").client
@@ -62,7 +63,7 @@ local function wifilist_ap_widget(ap, active)
                             wifi_color,
                             wifi_icon,
                             defaualt_config.wifilist_text_font,
-                            ssid
+                            gears.string.xml_escape(ssid)
                         ),
                         align = "center",
                         valign = "center",
@@ -272,8 +273,11 @@ local function process_wifi_list()
 end
 
 wifi:connect_signal("wifi::scan_done", process_wifi_list)
-wifi:connect_signal("wifi::state_changed", function()
-    if not popup_container.visible then return end
+wifi:connect_signal("wifi::state_changed", function(_, state)
+    -- naughty.notify({
+    --     text = "Wifi state changed, current state is " .. state,
+    -- })
+    if not widget.popup_container.visible then return end
     local active_ap = wifi:get_active_ap()
     if active_ap == nil then return end
 

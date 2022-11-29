@@ -42,7 +42,13 @@ function M:remove_with_key(key)
     end
 end
 
-function M:elements() return self._private.data end
+function M:elements()
+    local ret = {}
+    for _, v in ipairs(self._private.data) do
+        table.insert(ret, v)
+    end
+    return ret
+end
 
 function M:has(element) return self._private.key[self.key_func(element)] end
 

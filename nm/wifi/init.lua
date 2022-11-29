@@ -300,11 +300,12 @@ function M:get_wifilist()
         end
     end)
 
+    local ret = M._private.access_points:elements()
     table.sort(
-        M._private.access_points:elements(),
+        ret,
         function(a, b) return a:get_strength() > b:get_strength() end
     )
-    return M._private.access_points:elements(), scan_done
+    return ret, scan_done
 end
 
 M.parse_ap_info = parse_ap_info
