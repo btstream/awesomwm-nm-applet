@@ -1,2 +1,2 @@
-require(... .. ".nm.agent")
+-- require(... .. ".nm.agent")
 return require(... .. ".ui.applet")
